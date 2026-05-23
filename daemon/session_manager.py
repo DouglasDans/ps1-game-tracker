@@ -26,14 +26,17 @@ def strip_ps2_serial(stem: str) -> str:
 logger = logging.getLogger(__name__)
 
 _PATH_PLATFORMS: dict[str, str] = {
-    "PS1": "PS1",
-    "PSX": "PS1",
-    "PSP": "PSP",
+    "PS1":   "PS1",
+    "PSX":   "PS1",
+    "PSP":   "PSP",
+    "PS2":   "PS2",
+    "PS2SMB": "PS2",
 }
 
 _SOURCE_PLATFORMS: dict[str, str] = {
     "duckstation": "PS1",
     "ppsspp":      "PSP",
+    "samba":       "PS2",
 }
 
 

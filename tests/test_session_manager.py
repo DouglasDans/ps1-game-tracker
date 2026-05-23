@@ -103,6 +103,16 @@ def test_infer_metadata_platform_fallback_ppsspp():
     assert platform == "PSP"
 
 
+def test_infer_metadata_platform_from_ps2smb_dir():
+    _, platform = infer_metadata("/mnt/PS2SMB/DVD/SLUS_210.50.Burnout 3 - Takedown.iso", "samba")
+    assert platform == "PS2"
+
+
+def test_infer_metadata_platform_fallback_samba():
+    _, platform = infer_metadata("/mnt/roms/Game.iso", "samba")
+    assert platform == "PS2"
+
+
 def test_infer_metadata_platform_none_when_unknown():
     _, platform = infer_metadata("/mnt/roms/Game.iso", "retroarch")
     assert platform is None
