@@ -11,7 +11,9 @@ from fastapi.responses import FileResponse
 
 from daemon.db import crash_recovery, get_active_session, get_games, init_db
 from daemon.session_manager import SessionManager
+from daemon.watchers.lrtl import import_sessions
 from daemon.watchers.procfs import poll as procfs_poll
+from daemon.watchers.samba import poll as samba_poll
 
 logging.basicConfig(
     level=logging.INFO,
@@ -42,24 +44,63 @@ def make_conn(db_path: str) -> sqlite3.Connection:
     return conn
 
 
+def _is_retroarch_running() -> bool:
+    try:
+        for entry in Path("/proc").iterdir():
+            if not entry.name.isdigit():
+                continue
+            try:
+                cmdline = (
+                    (entry / "cmdline")
+                    .read_bytes()
+                    .decode("utf-8", errors="replace")
+                    .lower()
+                )
+                if "retroarch" in cmdline:
+                    return True
+            except (OSError, PermissionError):
+                continue
+    except OSError:
+        pass
+    return False
+
+
 def polling_loop(
     manager: SessionManager,
     config: dict,
     stop: threading.Event,
+    conn: sqlite3.Connection,
 ) -> None:
     process_names = config["watchers"]["process_names"]
     extensions = config["watchers"]["rom_extensions"]
     rom_dirs = config["watchers"].get("rom_dirs", [])
+    samba_rom_dirs = config["watchers"].get("samba_rom_dirs", [])
+    playlist_dirs = config["watchers"].get("retroarch_playlist_dirs", [])
     interval = config["daemon"]["poll_interval_s"]
+
+    retroarch_was_running = False
 
     while not stop.is_set():
         try:
             file_path, source = procfs_poll(process_names, extensions, rom_dirs)
+
+            if not file_path and samba_rom_dirs:
+                file_path, source = samba_poll(samba_rom_dirs, extensions)
+
             if file_path:
                 manager.on_game_start(file_path, source)
             elif manager._active_session_id is not None:
                 manager.on_game_stop()
             manager.send_heartbeat()
+
+            if playlist_dirs:
+                retroarch_running = _is_retroarch_running()
+                if retroarch_was_running and not retroarch_running:
+                    n = import_sessions(conn, playlist_dirs)
+                    if n:
+                        logger.info("lrtl import on RetroArch exit: %d session(s)", n)
+                retroarch_was_running = retroarch_running
+
         except Exception:
             logger.exception("Error in polling loop")
         stop.wait(interval)
@@ -75,13 +116,19 @@ async def lifespan(app: FastAPI):
     if recovered:
         logger.info("Crash recovery: closed %d orphaned session(s)", recovered)
 
+    playlist_dirs = config["watchers"].get("retroarch_playlist_dirs", [])
+    if playlist_dirs:
+        n = import_sessions(conn, playlist_dirs)
+        if n:
+            logger.info("lrtl startup import: %d session(s)", n)
+
     manager = SessionManager(conn)
     stop_event = threading.Event()
     app.state.conn = conn
 
     thread = threading.Thread(
         target=polling_loop,
-        args=(manager, config, stop_event),
+        args=(manager, config, stop_event, conn),
         daemon=True,
         name="procfs-poller",
     )

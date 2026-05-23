@@ -10,6 +10,13 @@ rom_extensions = [".cue", ".chd", ".bin", ".iso", ".cso", ".pbp"]
 # Apenas arquivos dentro destes diretórios são tratados como ROMs (whitelist)
 rom_dirs = ["/mnt/usb-flash"]
 
+# PS2 via OPL/Samba — paths no servidor onde as ISOs estão acessíveis
+# Requer: douglasdans ALL=(ALL) NOPASSWD: /usr/bin/smbstatus
+samba_rom_dirs = []  # ex: ["/srv/samba/ps2roms"]
+
+# RetroArch — diretório de playlists para importar sessões via .lrtl
+retroarch_playlist_dirs = []  # ex: ["~/.config/retroarch/playlists"]
+
 [retroachievements]
 enabled = false
 username = ""
