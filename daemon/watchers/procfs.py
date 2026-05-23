@@ -11,30 +11,6 @@ def is_rom_path(path: str, extensions: list[str]) -> bool:
     return any(lower.endswith(ext.lower()) for ext in extensions)
 
 
-def find_pids_by_name(process_names: list[str]) -> dict[str, int]:
-    """Returns {matched_name: pid} for running processes matching any entry in process_names."""
-    found: dict[str, int] = {}
-    try:
-        for entry in Path("/proc").iterdir():
-            if not entry.name.isdigit():
-                continue
-            try:
-                cmdline = (entry / "cmdline").read_bytes().decode("utf-8", errors="replace")
-                parts = cmdline.split("\x00")
-                if not parts or not parts[0]:
-                    continue
-                exe_name = Path(parts[0]).name
-                for name in process_names:
-                    if name.lower() in exe_name.lower():
-                        found[name] = int(entry.name)
-                        break
-            except (OSError, PermissionError):
-                continue
-    except OSError:
-        pass
-    return found
-
-
 def find_open_roms_for_pid(pid: int, extensions: list[str]) -> list[str]:
     """Returns resolved paths of ROM files currently open by the given PID."""
     roms: list[str] = []
@@ -51,25 +27,72 @@ def find_open_roms_for_pid(pid: int, extensions: list[str]) -> list[str]:
     return roms
 
 
+def get_ppid(pid: int) -> int | None:
+    """Read the parent PID from /proc/{pid}/status."""
+    try:
+        for line in Path(f"/proc/{pid}/status").read_text().splitlines():
+            if line.startswith("PPid:"):
+                return int(line.split()[1])
+    except (OSError, PermissionError):
+        pass
+    return None
+
+
 _SOURCE_MAP: dict[str, str] = {
     "duckstation-qt": "duckstation",
     "duckstation":    "duckstation",
-    "DuckStation":    "duckstation",
     "PPSSPPSDL":      "ppsspp",
     "ppsspp":         "ppsspp",
 }
 
 
+def identify_source(pid: int, process_names: list[str]) -> str | None:
+    """
+    Walk the process tree upward from pid, looking for a known emulator name
+    anywhere in the cmdline. Needed because AppImage processes (AppRun.wrapped)
+    don't have the emulator name in their own executable name.
+    """
+    visited: set[int] = set()
+    current: int | None = pid
+    while current and current > 1 and current not in visited:
+        visited.add(current)
+        try:
+            cmdline = (
+                Path(f"/proc/{current}/cmdline")
+                .read_bytes()
+                .decode("utf-8", errors="replace")
+                .lower()
+            )
+            for name in process_names:
+                if name.lower() in cmdline:
+                    return _SOURCE_MAP.get(name, name.lower())
+        except (OSError, PermissionError):
+            pass
+        current = get_ppid(current)
+    return None
+
+
 def poll(process_names: list[str], extensions: list[str]) -> tuple[str | None, str | None]:
     """
-    Single poll cycle.
-    Returns (file_path, source) if a ROM fd is open in any watched process, else (None, None).
+    Scan all /proc entries for open ROM file descriptors, then identify the
+    emulator source by walking the process tree upward via cmdline inspection.
+
+    Inverting the original name-first approach makes this work with AppImage
+    processes (DuckStation), where the process holding the ROM fd is
+    AppRun.wrapped — not a process with a recognisable emulator name.
     """
-    pids = find_pids_by_name(process_names)
-    for proc_name, pid in pids.items():
-        roms = find_open_roms_for_pid(pid, extensions)
-        if roms:
-            source = _SOURCE_MAP.get(proc_name, proc_name.lower())
-            logger.debug("ROM detected: %s via %s (pid %d)", roms[0], source, pid)
-            return roms[0], source
+    try:
+        for entry in Path("/proc").iterdir():
+            if not entry.name.isdigit():
+                continue
+            pid = int(entry.name)
+            roms = find_open_roms_for_pid(pid, extensions)
+            if not roms:
+                continue
+            source = identify_source(pid, process_names)
+            if source:
+                logger.debug("ROM detected: %s (pid %d, source %s)", roms[0], pid, source)
+                return roms[0], source
+    except OSError:
+        pass
     return None, None
