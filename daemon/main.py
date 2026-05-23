@@ -78,7 +78,10 @@ def polling_loop(
     playlist_dirs = config["watchers"].get("retroarch_playlist_dirs", [])
     interval = config["daemon"]["poll_interval_s"]
 
+    samba_debounce = config["watchers"].get("samba_debounce_polls", 3)
     retroarch_was_running = False
+    consecutive_misses = 0
+    active_source: str | None = None
 
     while not stop.is_set():
         try:
@@ -88,9 +91,20 @@ def polling_loop(
                 file_path, source = samba_poll(samba_rom_dirs, extensions)
 
             if file_path:
+                consecutive_misses = 0
+                active_source = source
                 manager.on_game_start(file_path, source)
             elif manager._active_session_id is not None:
-                manager.on_game_stop()
+                consecutive_misses += 1
+                threshold = samba_debounce if active_source == "samba" else 1
+                if consecutive_misses >= threshold:
+                    manager.on_game_stop()
+                    consecutive_misses = 0
+                    active_source = None
+            else:
+                consecutive_misses = 0
+                active_source = None
+
             manager.send_heartbeat()
 
             if playlist_dirs:
