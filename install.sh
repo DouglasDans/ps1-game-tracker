@@ -55,16 +55,17 @@ setup_data_dir() {
 
 # ── systemd system service ─────────────────────────────────────────────────────
 install_service() {
+    local port="$1"
     local service_file="/etc/systemd/system/$SERVICE_NAME.service"
     info "Installing systemd service (requires sudo)..."
 
     sudo tee "$service_file" > /dev/null <<EOF
 [Unit]
 Description=PS1 Game Tracker Daemon + API
-After=network.target
+After=network.target smbd.service
 
 [Service]
-ExecStart=$VENV_DIR/bin/uvicorn daemon.main:app --host 0.0.0.0 --port 8080
+ExecStart=$VENV_DIR/bin/uvicorn daemon.main:app --host 0.0.0.0 --port $port
 WorkingDirectory=$SCRIPT_DIR
 Restart=always
 RestartSec=5
@@ -78,6 +79,21 @@ EOF
     ok "Service installed: $service_file"
     info "User: $CURRENT_USER"
     info "WorkingDirectory: $SCRIPT_DIR"
+    info "Port: $port"
+}
+
+# ── sudoers ────────────────────────────────────────────────────────────────────
+setup_sudoers() {
+    local sudoers_file="/etc/sudoers.d/ps1-tracker"
+    local rule="$CURRENT_USER ALL=(ALL) NOPASSWD: /usr/bin/smbstatus"
+    if [[ -f "$sudoers_file" ]] && grep -qF "$rule" "$sudoers_file" 2>/dev/null; then
+        ok "Sudoers entry already exists"
+        return
+    fi
+    info "Adding sudoers entry for smbstatus (requires sudo)..."
+    echo "$rule" | sudo tee "$sudoers_file" > /dev/null
+    sudo chmod 0440 "$sudoers_file"
+    ok "Sudoers entry added: $sudoers_file"
 }
 
 # ── git init (if needed) ───────────────────────────────────────────────────────
@@ -99,18 +115,23 @@ main() {
     setup_venv
     setup_config
     setup_data_dir
-    install_service
+
+    local port
+    port=$("$VENV_DIR/bin/python3" -c "import tomllib; c=tomllib.load(open('$SCRIPT_DIR/config.toml','rb')); print(c['daemon']['port'])")
+
+    install_service "$port"
+    setup_sudoers
 
     echo ""
     echo "=== Installation complete ==="
     echo ""
     echo "Next steps:"
-    echo "  1. Edit $SCRIPT_DIR/config.toml"
+    echo "  1. Edit $SCRIPT_DIR/config.toml (if you haven't already)"
     echo "     (check process name with: ps aux | grep -i duck)"
     echo "  2. sudo systemctl enable $SERVICE_NAME"
     echo "  3. sudo systemctl start $SERVICE_NAME"
     echo "  4. sudo systemctl status $SERVICE_NAME"
-    echo "  5. Open http://localhost:8080"
+    echo "  5. Open http://localhost:$port"
     echo ""
 }
 
