@@ -1,6 +1,6 @@
 import os
 
-from daemon.watchers.procfs import find_open_roms_for_pid, get_ppid, is_rom_path
+from daemon.watchers.procfs import find_open_roms_for_pid, get_ppid, is_rom_path, select_preferred_rom
 
 
 def test_is_rom_path_detects_cue():
@@ -61,3 +61,30 @@ def test_get_ppid_matches_os_getppid():
 
 def test_get_ppid_nonexistent_pid_returns_none():
     assert get_ppid(999999999) is None
+
+
+def test_select_preferred_rom_prefers_chd_over_cue_and_bin():
+    roms = [
+        "/mnt/usb-flash/PS1/Game (Track 1).bin",
+        "/mnt/usb-flash/PS1/Game.cue",
+        "/mnt/usb-flash/PS1/Game.chd",
+    ]
+    assert select_preferred_rom(roms) == "/mnt/usb-flash/PS1/Game.chd"
+
+
+def test_select_preferred_rom_prefers_cue_over_bin():
+    roms = [
+        "/mnt/usb-flash/PS1/Game (Track 2).bin",
+        "/mnt/usb-flash/PS1/Game (Track 1).bin",
+        "/mnt/usb-flash/PS1/Game.cue",
+    ]
+    assert select_preferred_rom(roms) == "/mnt/usb-flash/PS1/Game.cue"
+
+
+def test_select_preferred_rom_returns_bin_when_only_option():
+    roms = ["/mnt/usb-flash/PSP/Game.iso"]
+    assert select_preferred_rom(roms) == "/mnt/usb-flash/PSP/Game.iso"
+
+
+def test_select_preferred_rom_returns_none_for_empty_list():
+    assert select_preferred_rom([]) is None

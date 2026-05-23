@@ -1,4 +1,4 @@
-from daemon.session_manager import SessionManager
+from daemon.session_manager import SessionManager, infer_metadata
 
 
 def test_on_game_start_opens_session(conn):
@@ -68,3 +68,51 @@ def test_active_file_path_cleared_after_stop(conn):
 
     assert manager._active_file_path is None
     assert manager._active_session_id is None
+
+
+# --- infer_metadata ---
+
+def test_infer_metadata_display_name_is_stem():
+    name, _ = infer_metadata(
+        "/mnt/usb-flash/PS1/CTR - Crash Team Racing (USA).bin", "duckstation"
+    )
+    assert name == "CTR - Crash Team Racing (USA)"
+
+
+def test_infer_metadata_platform_from_ps1_dir():
+    _, platform = infer_metadata(
+        "/mnt/usb-flash/Retrogaming/PS1/Crash Bandicoot (USA).bin", "duckstation"
+    )
+    assert platform == "PS1"
+
+
+def test_infer_metadata_platform_from_psp_dir():
+    _, platform = infer_metadata(
+        "/mnt/usb-flash/Retrogaming/PSP/Gran Turismo (USA).iso", "ppsspp"
+    )
+    assert platform == "PSP"
+
+
+def test_infer_metadata_platform_fallback_duckstation():
+    _, platform = infer_metadata("/mnt/roms/Crash.bin", "duckstation")
+    assert platform == "PS1"
+
+
+def test_infer_metadata_platform_fallback_ppsspp():
+    _, platform = infer_metadata("/mnt/roms/Game.iso", "ppsspp")
+    assert platform == "PSP"
+
+
+def test_infer_metadata_platform_none_when_unknown():
+    _, platform = infer_metadata("/mnt/roms/Game.iso", "retroarch")
+    assert platform is None
+
+
+def test_infer_metadata_persisted_on_game_start(conn):
+    manager = SessionManager(conn)
+    manager.on_game_start(
+        "/mnt/usb-flash/PS1/CTR - Crash Team Racing (USA).bin", "duckstation"
+    )
+    row = conn.execute("SELECT display_name, platform FROM games").fetchone()
+    assert row["display_name"] == "CTR - Crash Team Racing (USA)"
+    assert row["platform"] == "PS1"

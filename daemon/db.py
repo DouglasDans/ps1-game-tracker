@@ -50,8 +50,21 @@ def init_db(conn: sqlite3.Connection) -> None:
     conn.commit()
 
 
-def upsert_game(conn: sqlite3.Connection, file_path: str) -> int:
-    conn.execute("INSERT OR IGNORE INTO games (file_path) VALUES (?)", (file_path,))
+def upsert_game(
+    conn: sqlite3.Connection,
+    file_path: str,
+    display_name: str | None = None,
+    platform: str | None = None,
+) -> int:
+    conn.execute(
+        """
+        INSERT INTO games (file_path, display_name, platform) VALUES (?, ?, ?)
+        ON CONFLICT(file_path) DO UPDATE SET
+            display_name = COALESCE(games.display_name, excluded.display_name),
+            platform     = COALESCE(games.platform,     excluded.platform)
+        """,
+        (file_path, display_name, platform),
+    )
     conn.commit()
     row = conn.execute("SELECT id FROM games WHERE file_path = ?", (file_path,)).fetchone()
     return row[0]

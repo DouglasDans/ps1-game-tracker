@@ -3,6 +3,21 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
+_EXT_PRIORITY: dict[str, int] = {
+    ".chd": 0,
+    ".cue": 1,
+    ".iso": 2,
+    ".pbp": 3,
+    ".cso": 4,
+    ".bin": 5,
+}
+
+
+def select_preferred_rom(roms: list[str]) -> str | None:
+    if not roms:
+        return None
+    return min(roms, key=lambda p: _EXT_PRIORITY.get(Path(p).suffix.lower(), 99))
+
 
 def is_rom_path(path: str, extensions: list[str], rom_dirs: list[str]) -> bool:
     if not path:
@@ -99,8 +114,9 @@ def poll(
                 continue
             source = identify_source(pid, process_names)
             if source:
-                logger.debug("ROM detected: %s (pid %d, source %s)", roms[0], pid, source)
-                return roms[0], source
+                rom = select_preferred_rom(roms)
+                logger.debug("ROM detected: %s (pid %d, source %s)", rom, pid, source)
+                return rom, source
     except OSError:
         pass
     return None, None
