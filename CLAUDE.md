@@ -1,0 +1,153 @@
+# PS1 Game Tracker
+
+> Daemon de tracking de tempo de jogo estilo Steam para o PS1 Pro (Raspberry Pi 5 em case PSOne SCPH-9001). Detecta sessões automaticamente, sem intervenção manual. Dados locais em SQLite com espelho no Notion.
+
+Documentação completa do escopo: https://www.notion.so/PS1-Pro-Session-Tracker-Escopo-do-Projeto-36327b83275c80f797e0dfd09e479892
+Acesso via MCP: `mcp__claude_ai_Notion__notion-fetch` com a URL acima.
+
+---
+
+## Stack
+
+| Camada | Tecnologia |
+|---|---|
+| Daemon + API | Python 3.11+ / FastAPI / asyncio |
+| Banco de dados | SQLite 3 (stdlib `sqlite3`) |
+| Enriquecimento | ScreenScraper API / IGDB API (Fase 3) |
+| Sync | Notion API / `notion-client` (Fase 5) |
+| Frontend | HTML5 / CSS3 / Vanilla JS |
+| Serviço | systemd (system service, `User=douglasdans`) |
+| Browser | Chromium kiosk via `cage` (Wayland) |
+
+---
+
+## Comandos essenciais
+
+```bash
+# Ambiente de desenvolvimento
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt -r requirements-dev.txt
+
+# Servidor de desenvolvimento
+uvicorn daemon.main:app --reload --port 8080
+
+# Testes (obrigatório antes de qualquer commit)
+pytest
+
+# Deploy no Pi
+./install.sh
+sudo systemctl enable ps1-tracker && sudo systemctl start ps1-tracker
+
+# Status / logs do serviço
+sudo systemctl status ps1-tracker
+journalctl -u ps1-tracker -f
+```
+
+---
+
+## Estrutura de pastas
+
+```
+ps1-game-tracker/
+├── daemon/
+│   ├── watchers/
+│   │   ├── procfs.py        # DuckStation + PPSSPP via /proc/PID/fd/ [FASE 1]
+│   │   ├── samba.py         # PS2 via OPL / smbstatus [FASE 2]
+│   │   └── lrtl.py          # RetroArch .lrtl import [FASE 2]
+│   ├── enricher.py          # ScreenScraper → IGDB → regex [FASE 3]
+│   ├── session_manager.py   # open/close/heartbeat de sessão [FASE 1]
+│   ├── db.py                # schema SQLite + funções de acesso [FASE 1]
+│   └── main.py              # FastAPI app + threads [FASE 1]
+├── sync/
+│   └── notion_sync.py       # Notion sync periódico [FASE 5]
+├── web/
+│   ├── index.html           # MVP: tabela HTML simples [FASE 1]
+│   ├── style.css            # XMB-inspired dark theme [FASE 4]
+│   └── app.js               # Gamepad API navigation [FASE 4]
+├── tests/
+│   ├── conftest.py
+│   ├── test_db.py
+│   ├── test_procfs.py
+│   └── test_session_manager.py
+├── systemd/
+│   └── ps1-tracker.service  # gerado pelo install.sh
+├── install.sh
+├── config.toml              # não versionado (gitignored)
+├── config.toml.example      # template versionado
+├── pyproject.toml           # pytest config
+└── requirements.txt / requirements-dev.txt
+```
+
+---
+
+## Padrões de código
+
+- **Tipagem**: type hints obrigatórios em todas as funções públicas
+- **Conexão SQLite**: sempre injetada como parâmetro (`conn: sqlite3.Connection`) — nunca singleton global
+- **Threads**: polling loop em `threading.Thread(daemon=True)`, parado via `threading.Event`
+- **Config**: lida uma vez no startup via `tomllib` (Python 3.11+ stdlib) e passada como `dict`
+- **Imports**: stdlib → terceiros → internos, separados por linha em branco
+
+---
+
+## Arquitetura — decisões-chave
+
+### Por que procfs para DuckStation?
+DuckStation tem `playtime.dat` interno, mas armazena apenas tempo total acumulado + timestamp do último acesso — sem granularidade de sessão. A única forma de capturar sessões individuais (start/end times) é via `/proc/PID/fd/`, detectando o file descriptor da ROM aberta.
+
+### Por que SQLite como fonte da verdade?
+Zero latência, zero dependência de rede. Notion é espelho periódico para acesso remoto — falha de rede não quebra o tracking.
+
+### RetroArch é diferente do DuckStation
+O `.lrtl` do RetroArch armazena dados por sessão com timestamps. O `lrtl_importer` (Fase 2) lê esses arquivos no encerramento do processo e importa para o SQLite. DuckStation não tem equivalente — procfs é obrigatório.
+
+### Crash recovery
+Sessões sem `ended_at` com `heartbeat_at` > 5 minutos atrás são consideradas órfãs e fechadas no último `heartbeat_at` registrado.
+
+---
+
+## Configuração
+
+`config.toml` (não versionado — copiar de `config.toml.example`):
+
+```toml
+[daemon]
+poll_interval_s = 3
+port = 8080
+db_path = "~/.local/share/ps1-tracker/tracker.db"
+
+[watchers]
+process_names = ["duckstation-qt", "duckstation", "DuckStation", "PPSSPPSDL", "ppsspp"]
+rom_extensions = [".cue", ".chd", ".bin", ".iso", ".cso", ".pbp"]
+```
+
+**Risco conhecido:** o nome do processo do DuckStation AppImage pode variar. Verificar com `ps aux | grep -i duck` no Pi e ajustar `process_names` em `config.toml`.
+
+---
+
+## Deploy no Raspberry Pi
+
+```bash
+git clone <repo> ~/ps1-game-tracker
+cd ~/ps1-game-tracker
+./install.sh
+cp config.toml.example config.toml
+nano config.toml        # configurar tokens e paths
+sudo systemctl enable ps1-tracker && sudo systemctl start ps1-tracker
+```
+
+O serviço usa `User=douglasdans` e `After=network.target`. Na Fase 2 (samba_watcher), adicionar `After=smbd.service` na unit.
+
+---
+
+## Fases de implementação
+
+| Fase | Status | Escopo |
+|---|---|---|
+| 1 — Core | ✅ | SQLite + procfs_watcher + session_manager + API mínima |
+| 2 — Captura completa | ⬜ | samba_watcher (PS2) + lrtl_importer (RetroArch) |
+| 3 — Enriquecimento | ⬜ | ScreenScraper → IGDB → regex fallback |
+| 4 — Frontend XMB | ⬜ | Gamepad API + dark theme estilo XrossMediaBar |
+| 5 — Notion Sync | ⬜ | Push sessão + cron diário |
+| 6 — RetroAchievements | ⬜ | Hash PS1 rcheevos-compatible + achievements + progresso |
+| 7 — Produção | ⬜ | OSD Launcher integration + config completo |

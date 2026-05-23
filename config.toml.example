@@ -1,0 +1,19 @@
+[daemon]
+poll_interval_s = 3
+port = 8080
+db_path = "~/.local/share/ps1-tracker/tracker.db"
+
+[watchers]
+# Verificar com `ps aux | grep -i duck` no Pi — nome do processo pode variar
+process_names = ["duckstation-qt", "duckstation", "DuckStation", "PPSSPPSDL", "ppsspp"]
+rom_extensions = [".cue", ".chd", ".bin", ".iso", ".cso", ".pbp"]
+
+[retroachievements]
+enabled = false
+username = ""
+api_key = ""
+
+[notion]
+enabled = false
+token = ""
+database_id = ""
