@@ -144,3 +144,23 @@ def test_get_games_returns_game_after_session_closes(conn):
     assert len(games) == 1
     assert games[0]["file_path"] == "/roms/mgs.cue"
     assert games[0]["session_count"] == 1
+
+
+def test_get_games_aggregates_multi_track_playtime(conn):
+    id1 = upsert_game(conn, "/roms/Dino Crisis (Track 1).bin", "Dino Crisis", "PS1", "Dino Crisis")
+    id2 = upsert_game(conn, "/roms/Dino Crisis (Track 2).bin", "Dino Crisis", "PS1", "Dino Crisis")
+
+    s1 = open_session(conn, id1, "duckstation")
+    close_session(conn, s1)
+    conn.execute("UPDATE sessions SET duration_s = 100 WHERE id = ?", (s1,))
+
+    s2 = open_session(conn, id2, "duckstation")
+    close_session(conn, s2)
+    conn.execute("UPDATE sessions SET duration_s = 200 WHERE id = ?", (s2,))
+    conn.commit()
+
+    games = get_games(conn)
+    assert len(games) == 1
+    assert games[0]["display_name"] == "Dino Crisis"
+    assert games[0]["total_seconds"] == 300
+    assert games[0]["session_count"] == 2

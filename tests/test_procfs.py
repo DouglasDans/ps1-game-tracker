@@ -88,3 +88,11 @@ def test_select_preferred_rom_returns_bin_when_only_option():
 
 def test_select_preferred_rom_returns_none_for_empty_list():
     assert select_preferred_rom([]) is None
+
+
+def test_select_preferred_rom_multiple_bins_returns_alphabetically_first():
+    roms = [
+        "/mnt/usb-flash/PS1/Dino Crisis (Track 2).bin",
+        "/mnt/usb-flash/PS1/Dino Crisis (Track 1).bin",
+    ]
+    assert select_preferred_rom(roms) == "/mnt/usb-flash/PS1/Dino Crisis (Track 1).bin"

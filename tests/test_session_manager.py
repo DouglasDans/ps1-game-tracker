@@ -1,4 +1,4 @@
-from daemon.session_manager import SessionManager, infer_metadata
+from daemon.session_manager import SessionManager, infer_metadata, normalize_game_name
 
 
 def test_on_game_start_opens_session(conn):
@@ -76,7 +76,7 @@ def test_infer_metadata_display_name_is_stem():
     name, _ = infer_metadata(
         "/mnt/usb-flash/PS1/CTR - Crash Team Racing (USA).bin", "duckstation"
     )
-    assert name == "CTR - Crash Team Racing (USA)"
+    assert name == "CTR - Crash Team Racing"
 
 
 def test_infer_metadata_platform_from_ps1_dir():
@@ -108,11 +108,77 @@ def test_infer_metadata_platform_none_when_unknown():
     assert platform is None
 
 
+# --- normalize_game_name ---
+
+def test_normalize_strips_region():
+    assert normalize_game_name("Crash Bandicoot (USA)") == "Crash Bandicoot"
+
+
+def test_normalize_strips_version():
+    assert normalize_game_name("Metal Gear Solid (v1.0)") == "Metal Gear Solid"
+
+
+def test_normalize_strips_multiple_trailing_groups():
+    assert normalize_game_name("Crash Bandicoot (USA) (v1.1)") == "Crash Bandicoot"
+
+
+def test_normalize_strips_track():
+    assert normalize_game_name("Dino Crisis (USA) (v1.1) (Track 1)") == "Dino Crisis"
+
+
+def test_normalize_strips_disc():
+    assert normalize_game_name("Gran Turismo 2 (Disc 1)") == "Gran Turismo 2"
+
+
+def test_normalize_leaves_plain_title_unchanged():
+    assert normalize_game_name("Gran Turismo") == "Gran Turismo"
+
+
+# --- session flip prevention ---
+
+def test_on_game_start_multi_track_no_session_flip(conn):
+    manager = SessionManager(conn)
+    manager.on_game_start("/roms/Dino Crisis (USA) (Track 1).bin", "duckstation")
+    manager.on_game_start("/roms/Dino Crisis (USA) (Track 2).bin", "duckstation")
+
+    count = conn.execute("SELECT COUNT(*) FROM sessions").fetchone()[0]
+    assert count == 1
+
+
+def test_on_game_start_multi_disc_no_session_flip(conn):
+    manager = SessionManager(conn)
+    manager.on_game_start("/roms/Final Fantasy VII (USA) (Disc 1).bin", "duckstation")
+    manager.on_game_start("/roms/Final Fantasy VII (USA) (Disc 2).bin", "duckstation")
+
+    count = conn.execute("SELECT COUNT(*) FROM sessions").fetchone()[0]
+    assert count == 1
+
+
+def test_on_game_start_different_games_still_switches(conn):
+    manager = SessionManager(conn)
+    manager.on_game_start("/roms/Crash Bandicoot (USA).bin", "duckstation")
+    manager.on_game_start("/roms/Gran Turismo (USA).bin", "duckstation")
+
+    sessions = conn.execute("SELECT * FROM sessions ORDER BY id").fetchall()
+    assert len(sessions) == 2
+    assert sessions[0]["ended_at"] is not None
+    assert sessions[1]["ended_at"] is None
+
+
+def test_canonical_name_persisted_on_game_start(conn):
+    manager = SessionManager(conn)
+    manager.on_game_start("/roms/Dino Crisis (USA) (v1.1) (Track 1).bin", "duckstation")
+
+    row = conn.execute("SELECT display_name, canonical_name FROM games").fetchone()
+    assert row["display_name"] == "Dino Crisis"
+    assert row["canonical_name"] == "Dino Crisis"
+
+
 def test_infer_metadata_persisted_on_game_start(conn):
     manager = SessionManager(conn)
     manager.on_game_start(
         "/mnt/usb-flash/PS1/CTR - Crash Team Racing (USA).bin", "duckstation"
     )
     row = conn.execute("SELECT display_name, platform FROM games").fetchone()
-    assert row["display_name"] == "CTR - Crash Team Racing (USA)"
+    assert row["display_name"] == "CTR - Crash Team Racing"
     assert row["platform"] == "PS1"

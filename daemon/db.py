@@ -30,21 +30,28 @@ def init_db(conn: sqlite3.Connection) -> None:
             ended_abnormally INTEGER DEFAULT 0,
             synced_to_notion INTEGER DEFAULT 0
         );
-
-        CREATE VIEW IF NOT EXISTS playtime_summary AS
+    """)
+    try:
+        conn.execute("ALTER TABLE games ADD COLUMN canonical_name TEXT")
+        conn.commit()
+    except Exception:
+        pass
+    conn.executescript("""
+        DROP VIEW IF EXISTS playtime_summary;
+        CREATE VIEW playtime_summary AS
         SELECT
-            g.id,
-            g.file_path,
-            COALESCE(g.display_name, g.file_path) AS display_name,
-            g.platform,
-            g.cover_url,
-            COUNT(s.id)       AS session_count,
-            SUM(s.duration_s) AS total_seconds,
-            MAX(s.started_at) AS last_played
+            MIN(g.id)                                                          AS id,
+            MIN(g.file_path)                                                   AS file_path,
+            COALESCE(g.canonical_name, COALESCE(g.display_name, g.file_path)) AS display_name,
+            MIN(g.platform)                                                    AS platform,
+            MIN(g.cover_url)                                                   AS cover_url,
+            COUNT(s.id)                                                        AS session_count,
+            SUM(s.duration_s)                                                  AS total_seconds,
+            MAX(s.started_at)                                                  AS last_played
         FROM games g
         JOIN sessions s ON s.game_id = g.id
         WHERE s.ended_at IS NOT NULL
-        GROUP BY g.id
+        GROUP BY COALESCE(g.canonical_name, g.file_path)
         ORDER BY total_seconds DESC;
     """)
     conn.commit()
@@ -55,15 +62,18 @@ def upsert_game(
     file_path: str,
     display_name: str | None = None,
     platform: str | None = None,
+    canonical_name: str | None = None,
 ) -> int:
     conn.execute(
         """
-        INSERT INTO games (file_path, display_name, platform) VALUES (?, ?, ?)
+        INSERT INTO games (file_path, display_name, platform, canonical_name)
+        VALUES (?, ?, ?, ?)
         ON CONFLICT(file_path) DO UPDATE SET
-            display_name = COALESCE(games.display_name, excluded.display_name),
-            platform     = COALESCE(games.platform,     excluded.platform)
+            display_name   = COALESCE(games.display_name,   excluded.display_name),
+            platform       = COALESCE(games.platform,       excluded.platform),
+            canonical_name = COALESCE(games.canonical_name, excluded.canonical_name)
         """,
-        (file_path, display_name, platform),
+        (file_path, display_name, platform, canonical_name),
     )
     conn.commit()
     row = conn.execute("SELECT id FROM games WHERE file_path = ?", (file_path,)).fetchone()

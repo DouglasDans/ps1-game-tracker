@@ -16,7 +16,7 @@ _EXT_PRIORITY: dict[str, int] = {
 def select_preferred_rom(roms: list[str]) -> str | None:
     if not roms:
         return None
-    return min(roms, key=lambda p: _EXT_PRIORITY.get(Path(p).suffix.lower(), 99))
+    return min(roms, key=lambda p: (_EXT_PRIORITY.get(Path(p).suffix.lower(), 99), p))
 
 
 def is_rom_path(path: str, extensions: list[str], rom_dirs: list[str]) -> bool:
