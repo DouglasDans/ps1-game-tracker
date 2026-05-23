@@ -10,29 +10,15 @@ logger = logging.getLogger(__name__)
 
 
 def _parse_lrtl(data: dict) -> tuple[int, datetime] | None:
-    log = data.get("runtime_log")
-    if isinstance(log, list):
-        log = log[0] if log else None
-    if not isinstance(log, dict):
-        return None
-
-    runtime_s = (
-        log.get("runtime_hours", 0) * 3600
-        + log.get("runtime_minutes", 0) * 60
-        + log.get("runtime_seconds", 0)
-    )
+    # Real format: {"version": "1.0", "runtime": "H:MM:SS", "last_played": "YYYY-MM-DD HH:MM:SS"}
     try:
-        last_played = datetime(
-            log["last_played_year"],
-            log["last_played_month"],
-            log["last_played_day"],
-            log["last_played_hour"],
-            log["last_played_minute"],
-            log["last_played_second"],
-        )
+        h, m, s = data["runtime"].split(":")
+        runtime_s = int(h) * 3600 + int(m) * 60 + int(s)
+        last_played = datetime.strptime(data["last_played"], "%Y-%m-%d %H:%M:%S")
     except (KeyError, ValueError):
         return None
-
+    if runtime_s <= 0:
+        return None
     return runtime_s, last_played
 
 
@@ -85,9 +71,6 @@ def _import_file(conn: sqlite3.Connection, lrtl_path: Path) -> int:
         return 0
 
     runtime_s, last_played = parsed
-    if runtime_s <= 0:
-        return 0
-
     content_name = lrtl_path.stem
     delta_s = runtime_s - _known_runtime_s(conn, content_name)
     if delta_s <= 0:

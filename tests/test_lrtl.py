@@ -1,32 +1,16 @@
 import json
 
-import pytest
-
 from daemon.watchers.lrtl import _parse_lrtl, import_sessions
 
-_LRTL_DICT = {
+_LRTL = {
     "version": "1.0",
-    "runtime_log": {
-        "runtime_hours": 0,
-        "runtime_minutes": 30,
-        "runtime_seconds": 0,
-        "last_played_year": 2026,
-        "last_played_month": 5,
-        "last_played_day": 23,
-        "last_played_hour": 15,
-        "last_played_minute": 0,
-        "last_played_second": 0,
-    },
-}
-
-_LRTL_LIST = {
-    "version": "1.0",
-    "runtime_log": [_LRTL_DICT["runtime_log"]],
+    "runtime": "0:30:00",
+    "last_played": "2026-05-23 15:00:00",
 }
 
 
-def test_parse_lrtl_dict_format():
-    result = _parse_lrtl(_LRTL_DICT)
+def test_parse_lrtl_extracts_runtime_and_last_played():
+    result = _parse_lrtl(_LRTL)
     assert result is not None
     runtime_s, last_played = result
     assert runtime_s == 1800
@@ -34,45 +18,35 @@ def test_parse_lrtl_dict_format():
     assert last_played.hour == 15
 
 
-def test_parse_lrtl_list_format():
-    result = _parse_lrtl(_LRTL_LIST)
-    assert result is not None
-    runtime_s, _ = result
-    assert runtime_s == 1800
+def test_parse_lrtl_handles_hours():
+    data = {"version": "1.0", "runtime": "1:05:30", "last_played": "2026-05-23 10:00:00"}
+    runtime_s, _ = _parse_lrtl(data)
+    assert runtime_s == 3600 + 5 * 60 + 30
 
 
 def test_parse_lrtl_returns_none_for_empty_dict():
     assert _parse_lrtl({}) is None
 
 
-def test_parse_lrtl_returns_none_for_missing_date_fields():
-    assert _parse_lrtl({"runtime_log": {}}) is None
+def test_parse_lrtl_returns_none_for_missing_keys():
+    assert _parse_lrtl({"runtime": "0:30:00"}) is None
+    assert _parse_lrtl({"last_played": "2026-05-23 15:00:00"}) is None
 
 
-def test_parse_lrtl_returns_zero_runtime_when_all_zeros():
-    data = {
-        "runtime_log": {
-            "runtime_hours": 0,
-            "runtime_minutes": 0,
-            "runtime_seconds": 0,
-            "last_played_year": 2026,
-            "last_played_month": 5,
-            "last_played_day": 23,
-            "last_played_hour": 0,
-            "last_played_minute": 0,
-            "last_played_second": 0,
-        }
-    }
-    result = _parse_lrtl(data)
-    assert result is not None
-    runtime_s, _ = result
-    assert runtime_s == 0
+def test_parse_lrtl_returns_none_for_zero_runtime():
+    data = {"version": "1.0", "runtime": "0:00:00", "last_played": "2026-05-23 15:00:00"}
+    assert _parse_lrtl(data) is None
+
+
+def test_parse_lrtl_returns_none_for_malformed_runtime():
+    data = {"version": "1.0", "runtime": "invalid", "last_played": "2026-05-23 15:00:00"}
+    assert _parse_lrtl(data) is None
 
 
 def test_import_sessions_creates_session_for_new_content(conn, tmp_path):
     logs_dir = tmp_path / "logs"
     logs_dir.mkdir()
-    (logs_dir / "Ico.lrtl").write_text(json.dumps(_LRTL_DICT))
+    (logs_dir / "Ico.lrtl").write_text(json.dumps(_LRTL))
 
     n = import_sessions(conn, [str(tmp_path)])
 
@@ -80,7 +54,6 @@ def test_import_sessions_creates_session_for_new_content(conn, tmp_path):
     row = conn.execute(
         "SELECT duration_s, source FROM sessions WHERE source = 'retroarch'"
     ).fetchone()
-    assert row is not None
     assert row["duration_s"] == 1800
     assert row["source"] == "retroarch"
 
@@ -88,7 +61,7 @@ def test_import_sessions_creates_session_for_new_content(conn, tmp_path):
 def test_import_sessions_skips_already_imported(conn, tmp_path):
     logs_dir = tmp_path / "logs"
     logs_dir.mkdir()
-    (logs_dir / "Ico.lrtl").write_text(json.dumps(_LRTL_DICT))
+    (logs_dir / "Ico.lrtl").write_text(json.dumps(_LRTL))
 
     import_sessions(conn, [str(tmp_path)])
     n = import_sessions(conn, [str(tmp_path)])
@@ -98,36 +71,20 @@ def test_import_sessions_skips_already_imported(conn, tmp_path):
 
 
 def test_import_sessions_skips_nonexistent_dir(conn):
-    n = import_sessions(conn, ["/nonexistent/path"])
-    assert n == 0
+    assert import_sessions(conn, ["/nonexistent/path"]) == 0
 
 
 def test_import_sessions_handles_corrupt_lrtl(conn, tmp_path):
     logs_dir = tmp_path / "logs"
     logs_dir.mkdir()
     (logs_dir / "Broken.lrtl").write_text("not valid json {{{")
-
-    n = import_sessions(conn, [str(tmp_path)])
-    assert n == 0
+    assert import_sessions(conn, [str(tmp_path)]) == 0
 
 
 def test_import_sessions_skips_zero_runtime(conn, tmp_path):
     logs_dir = tmp_path / "logs"
     logs_dir.mkdir()
-    zero_runtime = {
-        "runtime_log": {
-            "runtime_hours": 0,
-            "runtime_minutes": 0,
-            "runtime_seconds": 0,
-            "last_played_year": 2026,
-            "last_played_month": 5,
-            "last_played_day": 23,
-            "last_played_hour": 0,
-            "last_played_minute": 0,
-            "last_played_second": 0,
-        }
-    }
-    (logs_dir / "Empty.lrtl").write_text(json.dumps(zero_runtime))
-
-    n = import_sessions(conn, [str(tmp_path)])
-    assert n == 0
+    (logs_dir / "Empty.lrtl").write_text(
+        json.dumps({"version": "1.0", "runtime": "0:00:00", "last_played": "2026-05-23 00:00:00"})
+    )
+    assert import_sessions(conn, [str(tmp_path)]) == 0
