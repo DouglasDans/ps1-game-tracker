@@ -149,7 +149,7 @@ O serviço usa `User=douglasdans` e `After=network.target`. Na Fase 2 (samba_wat
 |---|---|---|
 | 1 — Core | ✅ | SQLite + procfs_watcher + session_manager + API mínima |
 | 1.5 — Metadados locais | ✅ | display_name (Path.stem) + platform (por path/source); fix multi-track via select_preferred_rom |
-| 1.6 — Dedup multi-disco | 🔜 | jogos multi-disco (Disc 1/2/3) mapeados para um único registro no banco |
+| 1.6 — Dedup multi-disco | ✅ | normalize_game_name strip all trailing `(...)` + canonical_name + session flip fix |
 | 2 — Captura completa | ⬜ | samba_watcher (PS2) + lrtl_importer (RetroArch) |
 | 3 — Enriquecimento | ⬜ | ScreenScraper → IGDB → regex fallback |
 | 4 — Frontend XMB | ⬜ | Gamepad API + dark theme estilo XrossMediaBar |
@@ -172,4 +172,4 @@ Confirmado em produção com DuckStation AppImage + PPSSPP:
 
 **Fase 1.5 concluída (2026-05-23):** `display_name` agora é o stem do filename; `platform` inferido por segmento de path (`/PS1/`, `/PSP/`) com fallback por source. Fix de multi-track: `select_preferred_rom()` em `procfs.py` garante `.chd > .cue > .bin` — evita flip de sessão quando múltiplos fds de faixa estão abertos.
 
-**Pendente (Fase 1.6):** jogos multi-disco (`Disc 1`, `Disc 2`...) ainda criam entradas separadas no banco. Requer decisão sobre estratégia de dedup no schema antes de implementar.
+**Fase 1.6 concluída (2026-05-23):** `normalize_game_name` strip iterativo de todos os grupos `(...)` finais — região, versão, track, disco. `SessionManager` compara por `canonical_name` evitando session flip quando DuckStation alterna entre fds de tracks. `playtime_summary` agrega por `canonical_name`. Descoberta relevante: DuckStation não mantém `.cue` aberto — apenas os `.bin` dos tracks ficam nos fds.
