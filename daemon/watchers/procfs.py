@@ -4,21 +4,25 @@ from pathlib import Path
 logger = logging.getLogger(__name__)
 
 
-def is_rom_path(path: str, extensions: list[str]) -> bool:
+def is_rom_path(path: str, extensions: list[str], rom_dirs: list[str]) -> bool:
     if not path:
         return False
     lower = path.lower()
-    return any(lower.endswith(ext.lower()) for ext in extensions)
+    if not any(lower.endswith(ext.lower()) for ext in extensions):
+        return False
+    if rom_dirs:
+        return any(path.startswith(d) for d in rom_dirs)
+    return True
 
 
-def find_open_roms_for_pid(pid: int, extensions: list[str]) -> list[str]:
+def find_open_roms_for_pid(pid: int, extensions: list[str], rom_dirs: list[str]) -> list[str]:
     """Returns resolved paths of ROM files currently open by the given PID."""
     roms: list[str] = []
     try:
         for fd in Path(f"/proc/{pid}/fd").iterdir():
             try:
                 target = str(fd.resolve())
-                if is_rom_path(target, extensions):
+                if is_rom_path(target, extensions, rom_dirs):
                     roms.append(target)
             except (OSError, PermissionError):
                 continue
@@ -72,7 +76,11 @@ def identify_source(pid: int, process_names: list[str]) -> str | None:
     return None
 
 
-def poll(process_names: list[str], extensions: list[str]) -> tuple[str | None, str | None]:
+def poll(
+    process_names: list[str],
+    extensions: list[str],
+    rom_dirs: list[str],
+) -> tuple[str | None, str | None]:
     """
     Scan all /proc entries for open ROM file descriptors, then identify the
     emulator source by walking the process tree upward via cmdline inspection.
@@ -86,7 +94,7 @@ def poll(process_names: list[str], extensions: list[str]) -> tuple[str | None, s
             if not entry.name.isdigit():
                 continue
             pid = int(entry.name)
-            roms = find_open_roms_for_pid(pid, extensions)
+            roms = find_open_roms_for_pid(pid, extensions, rom_dirs)
             if not roms:
                 continue
             source = identify_source(pid, process_names)

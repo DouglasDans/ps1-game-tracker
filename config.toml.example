@@ -7,6 +7,8 @@ db_path = "~/.local/share/ps1-tracker/tracker.db"
 # Verificar com `ps aux | grep -i duck` no Pi — nome do processo pode variar
 process_names = ["duckstation-qt", "duckstation", "DuckStation", "PPSSPPSDL", "ppsspp"]
 rom_extensions = [".cue", ".chd", ".bin", ".iso", ".cso", ".pbp"]
+# Apenas arquivos dentro destes diretórios são tratados como ROMs (whitelist)
+rom_dirs = ["/mnt/usb-flash"]
 
 [retroachievements]
 enabled = false

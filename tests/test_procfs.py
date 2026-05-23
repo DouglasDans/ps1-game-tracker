@@ -4,39 +4,54 @@ from daemon.watchers.procfs import find_open_roms_for_pid, get_ppid, is_rom_path
 
 
 def test_is_rom_path_detects_cue():
-    assert is_rom_path("/media/roms/Metal Gear Solid.cue", [".cue", ".chd", ".bin"])
+    assert is_rom_path("/media/roms/Metal Gear Solid.cue", [".cue", ".chd", ".bin"], [])
 
 
 def test_is_rom_path_detects_chd():
-    assert is_rom_path("/media/roms/crash.chd", [".cue", ".chd", ".bin"])
+    assert is_rom_path("/media/roms/crash.chd", [".cue", ".chd", ".bin"], [])
 
 
 def test_is_rom_path_detects_bin():
-    assert is_rom_path("/media/roms/game.bin", [".cue", ".chd", ".bin"])
+    assert is_rom_path("/media/roms/game.bin", [".cue", ".chd", ".bin"], [])
 
 
 def test_is_rom_path_is_case_insensitive():
-    assert is_rom_path("/media/roms/game.CUE", [".cue"])
-    assert is_rom_path("/media/roms/game.CHD", [".CHD"])
+    assert is_rom_path("/media/roms/game.CUE", [".cue"], [])
+    assert is_rom_path("/media/roms/game.CHD", [".CHD"], [])
 
 
 def test_is_rom_path_rejects_save_state():
     assert not is_rom_path(
-        "/home/pi/.config/duckstation/savestates/mgs.sav", [".cue", ".chd", ".bin"]
+        "/home/pi/.config/duckstation/savestates/mgs.sav", [".cue", ".chd", ".bin"], []
     )
 
 
 def test_is_rom_path_rejects_shared_lib():
-    assert not is_rom_path("/usr/lib/libGL.so", [".cue", ".chd", ".bin"])
+    assert not is_rom_path("/usr/lib/libGL.so", [".cue", ".chd", ".bin"], [])
 
 
 def test_is_rom_path_rejects_empty_string():
-    assert not is_rom_path("", [".cue", ".chd"])
+    assert not is_rom_path("", [".cue", ".chd"], [])
+
+
+def test_is_rom_path_whitelist_accepts_file_inside_rom_dir():
+    assert is_rom_path(
+        "/mnt/usb-flash/Retrogaming/PS1/CTR - Crash Team Racing (USA).bin",
+        [".bin"],
+        ["/mnt/usb-flash"],
+    )
+
+
+def test_is_rom_path_whitelist_rejects_file_outside_rom_dir():
+    assert not is_rom_path(
+        "/home/douglasdans/.local/share/duckstation/vulkan_shaders.bin",
+        [".bin"],
+        ["/mnt/usb-flash"],
+    )
 
 
 def test_find_open_roms_for_nonexistent_pid_returns_empty():
-    # PID 999999999 will never exist
-    result = find_open_roms_for_pid(999999999, [".cue", ".chd"])
+    result = find_open_roms_for_pid(999999999, [".cue", ".chd"], [])
     assert result == []
 
 

@@ -49,11 +49,12 @@ def polling_loop(
 ) -> None:
     process_names = config["watchers"]["process_names"]
     extensions = config["watchers"]["rom_extensions"]
+    rom_dirs = config["watchers"].get("rom_dirs", [])
     interval = config["daemon"]["poll_interval_s"]
 
     while not stop.is_set():
         try:
-            file_path, source = procfs_poll(process_names, extensions)
+            file_path, source = procfs_poll(process_names, extensions, rom_dirs)
             if file_path:
                 manager.on_game_start(file_path, source)
             elif manager._active_session_id is not None:
