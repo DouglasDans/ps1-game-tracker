@@ -148,7 +148,8 @@ O serviço usa `User=douglasdans` e `After=network.target`. Na Fase 2 (samba_wat
 | Fase | Status | Escopo |
 |---|---|---|
 | 1 — Core | ✅ | SQLite + procfs_watcher + session_manager + API mínima |
-| 1.5 — Metadados locais | 🔜 | display_name (regex) + platform (por source/path) sem API externa |
+| 1.5 — Metadados locais | ✅ | display_name (Path.stem) + platform (por path/source); fix multi-track via select_preferred_rom |
+| 1.6 — Dedup multi-disco | 🔜 | jogos multi-disco (Disc 1/2/3) mapeados para um único registro no banco |
 | 2 — Captura completa | ⬜ | samba_watcher (PS2) + lrtl_importer (RetroArch) |
 | 3 — Enriquecimento | ⬜ | ScreenScraper → IGDB → regex fallback |
 | 4 — Frontend XMB | ⬜ | Gamepad API + dark theme estilo XrossMediaBar |
@@ -169,4 +170,6 @@ Confirmado em produção com DuckStation AppImage + PPSSPP:
 | Michael Jackson: The Experience | ppsspp | ✅ detectado |
 | vulkan_shaders.bin | — | ✅ filtrado pelo rom_dirs |
 
-**Pendente antes da Fase 2:** inferência local de `display_name` e `platform` — `platform` está null em todos os jogos, `display_name` é o path completo. Implementar em `session_manager.py` sem API externa (Fase 1.5).
+**Fase 1.5 concluída (2026-05-23):** `display_name` agora é o stem do filename; `platform` inferido por segmento de path (`/PS1/`, `/PSP/`) com fallback por source. Fix de multi-track: `select_preferred_rom()` em `procfs.py` garante `.chd > .cue > .bin` — evita flip de sessão quando múltiplos fds de faixa estão abertos.
+
+**Pendente (Fase 1.6):** jogos multi-disco (`Disc 1`, `Disc 2`...) ainda criam entradas separadas no banco. Requer decisão sobre estratégia de dedup no schema antes de implementar.
