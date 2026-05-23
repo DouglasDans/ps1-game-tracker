@@ -7,6 +7,7 @@ from pathlib import Path
 from daemon.db import close_session, heartbeat, open_session, upsert_game
 
 _TRAILING_PARENS_RE = re.compile(r"\s*\([^)]*\)\s*$")
+_PS2_SERIAL_RE = re.compile(r"^[A-Z]{4}_\d{3}\.\d{2}\.(.+)$")
 
 
 def normalize_game_name(stem: str) -> str:
@@ -16,6 +17,11 @@ def normalize_game_name(stem: str) -> str:
         if stripped == result:
             return result
         result = stripped
+
+
+def strip_ps2_serial(stem: str) -> str:
+    m = _PS2_SERIAL_RE.match(stem)
+    return m.group(1) if m else stem
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +38,7 @@ _SOURCE_PLATFORMS: dict[str, str] = {
 
 
 def infer_metadata(file_path: str, source: str) -> tuple[str, str | None]:
-    display_name = normalize_game_name(Path(file_path).stem)
+    display_name = normalize_game_name(strip_ps2_serial(Path(file_path).stem))
     parts = Path(file_path).parts
     for part in parts:
         platform = _PATH_PLATFORMS.get(part.upper())

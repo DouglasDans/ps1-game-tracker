@@ -81,6 +81,17 @@ def test_import_sessions_handles_corrupt_lrtl(conn, tmp_path):
     assert import_sessions(conn, [str(tmp_path)]) == 0
 
 
+def test_import_sessions_normalizes_canonical_name(conn, tmp_path):
+    logs_dir = tmp_path / "logs"
+    logs_dir.mkdir()
+    (logs_dir / "Ico (USA).lrtl").write_text(json.dumps(_LRTL))
+
+    import_sessions(conn, [str(tmp_path)])
+
+    row = conn.execute("SELECT canonical_name FROM games").fetchone()
+    assert row["canonical_name"] == "Ico"
+
+
 def test_import_sessions_skips_zero_runtime(conn, tmp_path):
     logs_dir = tmp_path / "logs"
     logs_dir.mkdir()

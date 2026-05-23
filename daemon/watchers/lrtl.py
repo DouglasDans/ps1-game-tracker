@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 from daemon.db import upsert_game
+from daemon.session_manager import normalize_game_name
 
 logger = logging.getLogger(__name__)
 
@@ -71,7 +72,7 @@ def _import_file(conn: sqlite3.Connection, lrtl_path: Path) -> int:
         return 0
 
     runtime_s, last_played = parsed
-    content_name = lrtl_path.stem
+    content_name = normalize_game_name(lrtl_path.stem)
     delta_s = runtime_s - _known_runtime_s(conn, content_name)
     if delta_s <= 0:
         return 0

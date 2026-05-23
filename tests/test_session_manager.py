@@ -1,4 +1,4 @@
-from daemon.session_manager import SessionManager, infer_metadata, normalize_game_name
+from daemon.session_manager import SessionManager, infer_metadata, normalize_game_name, strip_ps2_serial
 
 
 def test_on_game_start_opens_session(conn):
@@ -132,6 +132,36 @@ def test_normalize_strips_disc():
 
 def test_normalize_leaves_plain_title_unchanged():
     assert normalize_game_name("Gran Turismo") == "Gran Turismo"
+
+
+# --- strip_ps2_serial ---
+
+def test_strip_ps2_serial_removes_slus_prefix():
+    assert strip_ps2_serial("SLUS_210.50.Burnout 3 - Takedown") == "Burnout 3 - Takedown"
+
+
+def test_strip_ps2_serial_removes_sces_prefix():
+    assert strip_ps2_serial("SCES_500.03.ICO") == "ICO"
+
+
+def test_strip_ps2_serial_removes_slpm_prefix():
+    assert strip_ps2_serial("SLPM_650.84.Metal Gear Solid 2") == "Metal Gear Solid 2"
+
+
+def test_strip_ps2_serial_leaves_normal_filename_unchanged():
+    assert strip_ps2_serial("CTR - Crash Team Racing (USA)") == "CTR - Crash Team Racing (USA)"
+
+
+def test_strip_ps2_serial_leaves_ps1_filename_unchanged():
+    assert strip_ps2_serial("Metal Gear Solid (Disc 1)") == "Metal Gear Solid (Disc 1)"
+
+
+def test_infer_metadata_strips_ps2_serial_in_display_name(conn):
+    manager = SessionManager(conn)
+    manager.on_game_start("/mnt/PS2SMB/DVD/SLUS_210.50.Burnout 3 - Takedown.iso", "samba")
+    row = conn.execute("SELECT display_name, canonical_name FROM games").fetchone()
+    assert row["display_name"] == "Burnout 3 - Takedown"
+    assert row["canonical_name"] == "Burnout 3 - Takedown"
 
 
 # --- session flip prevention ---
