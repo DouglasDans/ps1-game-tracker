@@ -197,6 +197,40 @@ O serviço usa `User=douglasdans` e `After=network.target`. Na Fase 2 (samba_wat
 
 ---
 
+## Diagnóstico remoto do Pi
+
+A API está em `http://192.168.1.150:9876`. Comandos úteis para diagnóstico sem SSH:
+
+```bash
+# Ver todos os jogos com playtime
+curl -s http://192.168.1.150:9876/games | python3 -m json.tool
+
+# Jogos sem cover (enriquecimento pendente ou falhou)
+curl -s http://192.168.1.150:9876/games | python3 -c "
+import json, sys
+games = json.load(sys.stdin)
+no_cover = [g for g in games if not g['cover_url']]
+with_cover = [g for g in games if g['cover_url']]
+print(f'Total: {len(games)} | Com cover: {len(with_cover)} | Sem cover: {len(no_cover)}')
+for g in no_cover:
+    print(f'  [{g[\"platform\"] or \"?\"}] {g[\"display_name\"]}')
+"
+
+# Buscar jogo específico por nome
+curl -s http://192.168.1.150:9876/games | python3 -c "
+import json, sys
+games = json.load(sys.stdin)
+for g in games:
+    if 'sonic' in g['display_name'].lower():
+        print(json.dumps(g, indent=2))
+"
+
+# Sessão ativa agora
+curl -s http://192.168.1.150:9876/sessions/active | python3 -m json.tool
+```
+
+---
+
 ## Fases de implementação
 
 | Fase                    | Status | Escopo                                                                                          |
