@@ -306,6 +306,24 @@ def get_stats_summary(conn: sqlite3.Connection) -> dict:
     }
 
 
+def get_recent_sessions(conn: sqlite3.Connection, limit: int = 20) -> list[dict]:
+    rows = conn.execute(
+        """
+        SELECT s.id, s.game_id,
+               COALESCE(g.display_name, g.file_path) AS display_name,
+               g.platform, g.cover_url, s.source,
+               s.started_at, s.ended_at, s.duration_s
+        FROM sessions s
+        JOIN games g ON g.id = s.game_id
+        WHERE s.ended_at IS NOT NULL
+        ORDER BY s.started_at DESC
+        LIMIT ?
+        """,
+        (limit,),
+    ).fetchall()
+    return [dict(r) for r in rows]
+
+
 def get_games(conn: sqlite3.Connection) -> list[dict]:
     rows = conn.execute(
         "SELECT id, file_path, display_name, platform, cover_url, "

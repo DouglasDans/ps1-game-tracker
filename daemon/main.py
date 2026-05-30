@@ -15,6 +15,7 @@ from daemon.db import (
     get_active_session,
     get_game_detail,
     get_games,
+    get_recent_sessions,
     get_stats_summary,
     get_unenriched_games,
     init_db,
@@ -232,6 +233,11 @@ def active_session():
 @app.get("/games")
 def games():
     return get_games(app.state.conn)
+
+
+@app.get("/sessions/recent")
+def recent_sessions(limit: int = 20):
+    return get_recent_sessions(app.state.conn, limit=limit)
 
 
 @app.get("/games/{game_id}")

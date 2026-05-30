@@ -7,6 +7,7 @@ from daemon.db import (
     get_active_session,
     get_game_detail,
     get_games,
+    get_recent_sessions,
     get_stats_summary,
     get_unenriched_games,
     update_game_enrichment,
@@ -379,3 +380,65 @@ def test_get_stats_summary_by_platform(conn):
     assert platforms["PS1"]["pct"] == 60
     assert platforms["PS2"]["total_seconds"] == 4000
     assert platforms["PS2"]["pct"] == 40
+
+
+# --- get_recent_sessions ---
+
+def test_get_recent_sessions_empty_db(conn):
+    assert get_recent_sessions(conn) == []
+
+
+def test_get_recent_sessions_excludes_open_sessions(conn):
+    game_id = upsert_game(conn, "/roms/mgs.chd", "MGS", "PS1", "MGS")
+    open_session(conn, game_id, "duckstation")
+
+    assert get_recent_sessions(conn) == []
+
+
+def test_get_recent_sessions_returns_closed_sessions(conn):
+    game_id = upsert_game(conn, "/roms/ctr.chd", "Crash Team Racing", "PS1", "Crash Team Racing")
+    session_id = open_session(conn, game_id, "duckstation")
+    close_session(conn, session_id)
+    conn.execute("UPDATE sessions SET duration_s = 3600 WHERE id = ?", (session_id,))
+    conn.commit()
+
+    result = get_recent_sessions(conn)
+    assert len(result) == 1
+    assert result[0]["game_id"] == game_id
+    assert result[0]["display_name"] == "Crash Team Racing"
+    assert result[0]["platform"] == "PS1"
+    assert result[0]["source"] == "duckstation"
+    assert result[0]["duration_s"] == 3600
+    assert result[0]["ended_at"] is not None
+
+
+def test_get_recent_sessions_ordered_newest_first(conn):
+    game_id = upsert_game(conn, "/roms/mgs.chd", "MGS", "PS1", "MGS")
+
+    s1 = open_session(conn, game_id, "duckstation")
+    close_session(conn, s1)
+    conn.execute(
+        "UPDATE sessions SET started_at = '2026-01-01 10:00:00', duration_s = 100 WHERE id = ?",
+        (s1,),
+    )
+    s2 = open_session(conn, game_id, "duckstation")
+    close_session(conn, s2)
+    conn.execute(
+        "UPDATE sessions SET started_at = '2026-03-01 10:00:00', duration_s = 200 WHERE id = ?",
+        (s2,),
+    )
+    conn.commit()
+
+    result = get_recent_sessions(conn)
+    assert result[0]["started_at"] == "2026-03-01 10:00:00"
+    assert result[1]["started_at"] == "2026-01-01 10:00:00"
+
+
+def test_get_recent_sessions_respects_limit(conn):
+    game_id = upsert_game(conn, "/roms/mgs.chd", "MGS", "PS1", "MGS")
+    for _ in range(5):
+        s = open_session(conn, game_id, "duckstation")
+        close_session(conn, s)
+
+    result = get_recent_sessions(conn, limit=3)
+    assert len(result) == 3
