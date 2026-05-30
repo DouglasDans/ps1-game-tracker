@@ -136,10 +136,6 @@ def migrate_retroarch_games(conn: sqlite3.Connection, playlist_dirs: list[str]) 
         new_name = normalize_game_name(old_name)
 
         if new_name not in playlist_map:
-            conn.execute("DELETE FROM sessions WHERE game_id = ?", (game_id,))
-            conn.execute("DELETE FROM games WHERE id = ?", (game_id,))
-            conn.commit()
-            logger.info("Removed unlisted RetroArch game: %s", old_name)
             continue
 
         platform = playlist_map[new_name] or None

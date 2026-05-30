@@ -90,6 +90,54 @@ ps1-game-tracker/
 
 ---
 
+## Schema do banco de dados
+
+```
+┌─────────────────────────────────────────────────────────┐
+│ games                                                   │
+├─────────────────────────────────────────────────────────┤
+│ id                    INTEGER PK                        │
+│ file_path             TEXT UNIQUE  ← chave natural      │
+│ file_md5              TEXT                              │
+│ display_name          TEXT                              │
+│ canonical_name        TEXT  ← normalizado (sem região)  │
+│ platform              TEXT  ← PS1 / PS2 / PSP / …      │
+│ cover_url             TEXT                              │
+│ genre                 TEXT                              │
+│ release_year          INTEGER                           │
+│ enriched_at           DATETIME                          │
+│ notion_page_id        TEXT                              │
+│ ra_game_id            INTEGER                           │
+│ ra_points_possible    INTEGER                           │
+│ ra_achievements_count INTEGER                           │
+└────────────────────────┬────────────────────────────────┘
+                         │ 1
+                         │
+                         │ N
+┌────────────────────────▼────────────────────────────────┐
+│ sessions                                                │
+├─────────────────────────────────────────────────────────┤
+│ id               INTEGER PK                             │
+│ game_id          INTEGER FK → games.id                  │
+│ source           TEXT  ← duckstation / ppsspp / samba / │
+│                              retroarch                  │
+│ started_at       DATETIME                               │
+│ ended_at         DATETIME                               │
+│ heartbeat_at     DATETIME                               │
+│ duration_s       INTEGER                                │
+│ ended_abnormally INTEGER  ← 0 / 1                       │
+│ synced_to_notion INTEGER  ← 0 / 1                       │
+└─────────────────────────────────────────────────────────┘
+
+VIEW playtime_summary
+  Agrega sessions por canonical_name (ou file_path).
+  Expõe: id, file_path, display_name, platform, cover_url,
+         session_count, total_seconds, last_played.
+  Usada pelo endpoint GET /games.
+```
+
+---
+
 ## Arquitetura — decisões-chave
 
 ### Por que procfs para DuckStation?

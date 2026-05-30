@@ -252,15 +252,15 @@ def test_migrate_sets_platform_from_playlist(conn, tmp_path):
     assert row["platform"] == "PS1"
 
 
-def test_migrate_deletes_game_not_in_playlist(conn, tmp_path):
+def test_migrate_skips_game_not_in_playlist(conn, tmp_path):
     game_id = _insert_retroarch_game(conn, "retroarch://cube", "cube", "cube")
     _insert_session(conn, game_id)
     (tmp_path / "Sony - PlayStation.lpl").write_text(json.dumps({"version": "1.5", "items": []}))
 
     migrate_retroarch_games(conn, [str(tmp_path)])
 
-    assert conn.execute("SELECT COUNT(*) FROM games").fetchone()[0] == 0
-    assert conn.execute("SELECT COUNT(*) FROM sessions").fetchone()[0] == 0
+    assert conn.execute("SELECT COUNT(*) FROM games").fetchone()[0] == 1
+    assert conn.execute("SELECT COUNT(*) FROM sessions").fetchone()[0] == 1
 
 
 def test_migrate_merges_sessions_on_normalization_collision(conn, tmp_path):
