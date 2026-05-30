@@ -53,7 +53,16 @@ def init_db(conn: sqlite3.Connection) -> None:
             MIN(g.cover_url)                                                   AS cover_url,
             COUNT(s.id)                                                        AS session_count,
             SUM(s.duration_s)                                                  AS total_seconds,
-            MAX(s.started_at)                                                  AS last_played
+            MAX(s.started_at)                                                  AS last_played,
+            (
+                SELECT s2.source
+                FROM sessions s2
+                JOIN games g2 ON g2.id = s2.game_id
+                WHERE COALESCE(g2.canonical_name, g2.file_path) = COALESCE(g.canonical_name, g.file_path)
+                  AND s2.ended_at IS NOT NULL
+                ORDER BY s2.started_at DESC
+                LIMIT 1
+            )                                                                  AS last_source
         FROM games g
         JOIN sessions s ON s.game_id = g.id
         WHERE s.ended_at IS NOT NULL
@@ -327,6 +336,6 @@ def get_recent_sessions(conn: sqlite3.Connection, limit: int = 20) -> list[dict]
 def get_games(conn: sqlite3.Connection) -> list[dict]:
     rows = conn.execute(
         "SELECT id, file_path, display_name, platform, cover_url, "
-        "session_count, total_seconds, last_played FROM playtime_summary"
+        "session_count, total_seconds, last_played, last_source FROM playtime_summary"
     ).fetchall()
     return [dict(r) for r in rows]

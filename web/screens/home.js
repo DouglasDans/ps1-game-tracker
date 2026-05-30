@@ -1,4 +1,4 @@
-import { GAMES, ACTIVE, STATS } from '../data/mock.js';
+import { fetchGames, fetchActiveSession, fetchStats } from '../data/api.js';
 import { fmtTime, fmtDate, fmtDateShort, fmtSource, cardGradient, platformLogoImg, PLATFORM_LOGO } from '../utils.js';
 
 const CARD_W   = 130;
@@ -8,75 +8,90 @@ let _savedIndex = 0;
 
 export function mount(container, navigate, params = {}) {
   let selectedIndex = params.selectedIndex ?? _savedIndex;
-  let focus = 'row'; // 'row' | 'stats'
-  const items = [...GAMES, { id: 'library', display_name: 'Library', _lib: true }];
-
-  container.innerHTML = buildHTML(items, selectedIndex);
-  updateHero(items[selectedIndex]);
-  scrollRow(selectedIndex);
-
-  if (params.scrollToStats) {
-    requestAnimationFrame(() =>
-      document.getElementById('section-stats')?.scrollIntoView({ behavior: 'smooth' })
-    );
-    focus = 'stats';
-  }
-
-  function onKey(e) {
-    if (focus === 'row') {
-      switch (e.key) {
-        case 'ArrowLeft':
-          if (selectedIndex > 0) { selectedIndex--; refresh(items, selectedIndex); }
-          break;
-        case 'ArrowRight':
-          if (selectedIndex < items.length - 1) { selectedIndex++; refresh(items, selectedIndex); }
-          break;
-        case 'ArrowDown':
-          e.preventDefault();
-          focus = 'stats';
-          document.getElementById('section-stats')?.scrollIntoView({ behavior: 'smooth' });
-          break;
-        case 'Enter':
-        case ' ':
-          e.preventDefault();
-          _savedIndex = selectedIndex;
-          if (items[selectedIndex]._lib) { navigate('library'); }
-          else { navigate('detail', { gameId: items[selectedIndex].id }); }
-          break;
-      }
-    } else {
-      if (e.key === 'ArrowUp') {
-        e.preventDefault();
-        focus = 'row';
-        document.getElementById('section-home')?.scrollIntoView({ behavior: 'smooth' });
-      }
-    }
-  }
-
-  document.addEventListener('keydown', onKey);
-
+  let focus = 'row';
+  let onKeyHandler = null;
   let timerInterval = null;
-  if (ACTIVE) {
-    timerInterval = setInterval(() => {
-      if (items[selectedIndex].id === ACTIVE.game_id) updateHero(items[selectedIndex]);
-    }, 1000);
-  }
+  let cancelled = false;
+
+  container.innerHTML = '<div style="padding:40px;color:var(--text-muted);text-align:center">Carregando...</div>';
+
+  Promise.all([fetchGames(), fetchActiveSession(), fetchStats()])
+    .then(([games, active, stats]) => {
+      if (cancelled) return;
+
+      const items = [...games, { id: 'library', display_name: 'Library', _lib: true }];
+      container.innerHTML = buildHTML(items, selectedIndex, active, stats, games);
+      updateHero(items[selectedIndex], active, games);
+      scrollRow(selectedIndex);
+
+      if (params.scrollToStats) {
+        requestAnimationFrame(() =>
+          document.getElementById('section-stats')?.scrollIntoView({ behavior: 'smooth' })
+        );
+        focus = 'stats';
+      }
+
+      function onKey(e) {
+        if (focus === 'row') {
+          switch (e.key) {
+            case 'ArrowLeft':
+              if (selectedIndex > 0) { selectedIndex--; refresh(items, selectedIndex, active, games); }
+              break;
+            case 'ArrowRight':
+              if (selectedIndex < items.length - 1) { selectedIndex++; refresh(items, selectedIndex, active, games); }
+              break;
+            case 'ArrowDown':
+              e.preventDefault();
+              focus = 'stats';
+              document.getElementById('section-stats')?.scrollIntoView({ behavior: 'smooth' });
+              break;
+            case 'Enter':
+            case ' ':
+              e.preventDefault();
+              _savedIndex = selectedIndex;
+              if (items[selectedIndex]._lib) { navigate('library'); }
+              else { navigate('detail', { gameId: items[selectedIndex].id }); }
+              break;
+          }
+        } else {
+          if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            focus = 'row';
+            document.getElementById('section-home')?.scrollIntoView({ behavior: 'smooth' });
+          }
+        }
+      }
+
+      onKeyHandler = onKey;
+      document.addEventListener('keydown', onKey);
+
+      if (active) {
+        timerInterval = setInterval(() => {
+          if (items[selectedIndex].id === active.game_id) updateHero(items[selectedIndex], active, games);
+        }, 1000);
+      }
+    })
+    .catch(err => {
+      if (cancelled) return;
+      container.innerHTML = `<div style="padding:40px;color:var(--text-muted);text-align:center">Erro ao carregar dados.<br><small>${err.message}</small></div>`;
+    });
 
   return () => {
-    document.removeEventListener('keydown', onKey);
+    cancelled = true;
+    if (onKeyHandler) document.removeEventListener('keydown', onKeyHandler);
     if (timerInterval) clearInterval(timerInterval);
   };
 }
 
-function refresh(items, selectedIndex) {
+function refresh(items, selectedIndex, active, games) {
   document.querySelectorAll('.game-card').forEach((el, i) => {
     el.classList.toggle('selected', i === selectedIndex);
   });
-  updateHero(items[selectedIndex]);
+  updateHero(items[selectedIndex], active, games);
   scrollRow(selectedIndex);
 }
 
-function buildHTML(items, selectedIndex) {
+function buildHTML(items, selectedIndex, active, stats, games) {
   const cards = items.map((item, i) => {
     const sel = i === selectedIndex ? ' selected' : '';
     if (item._lib) {
@@ -84,7 +99,7 @@ function buildHTML(items, selectedIndex) {
         <div class="card-library-inner">LIBRARY</div>
       </div>`;
     }
-    const isActive = ACTIVE && item.id === ACTIVE.game_id;
+    const isActive = active && item.id === active.game_id;
     const logo = PLATFORM_LOGO[item.platform];
     const cover = item.cover_url
       ? `<img src="${item.cover_url}" alt="" class="cover-img">`
@@ -126,14 +141,14 @@ function buildHTML(items, selectedIndex) {
       </div>
     </div>
     <div class="section-stats" id="section-stats">
-      ${buildStatsHTML()}
+      ${buildStatsHTML(stats, games)}
     </div>
   </div>`;
 }
 
-function buildStatsHTML() {
-  const s = STATS;
-  const topGames = [...GAMES].sort((a, b) => b.total_seconds - a.total_seconds).slice(0, 5);
+function buildStatsHTML(stats, games) {
+  const s = stats;
+  const topGames = [...games].sort((a, b) => b.total_seconds - a.total_seconds).slice(0, 5);
 
   const bars = s.by_platform.map(p => `
     <div class="platform-bar-row">
@@ -192,7 +207,7 @@ function buildStatsHTML() {
     </div>`;
 }
 
-function updateHero(item) {
+function updateHero(item, active, games) {
   const badge        = document.getElementById('hero-badge');
   const platformInfo = document.getElementById('hero-platform-info');
   const title        = document.getElementById('hero-title');
@@ -207,13 +222,13 @@ function updateHero(item) {
     title.textContent = 'Biblioteca';
     lastSession.textContent = '—';
     emulator.textContent = '—';
-    sessions.textContent = `${GAMES.length} jogos`;
+    sessions.textContent = `${games.length} jogos`;
     return;
   }
 
-  const isActive = ACTIVE && item.id === ACTIVE.game_id;
+  const isActive = active && item.id === active.game_id;
   if (isActive) {
-    const elapsed = Math.floor((Date.now() - new Date(ACTIVE.started_at).getTime()) / 1000);
+    const elapsed = Math.floor((Date.now() - new Date(active.started_at).getTime()) / 1000);
     badge.hidden = false;
     badge.textContent = `SESSÃO ATIVA · ${fmtTime(elapsed)}`;
   } else {

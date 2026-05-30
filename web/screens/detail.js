@@ -1,17 +1,37 @@
-import { GAME_DETAIL } from '../data/mock.js';
+import { fetchGameDetail } from '../data/api.js';
 import { fmtTime, fmtDate, fmtSource, cardGradient, platformLogoImg, PLATFORM_LOGO } from '../utils.js';
 
 export function mount(container, navigate, params = {}) {
-  const detail = GAME_DETAIL[params.gameId];
-  container.innerHTML = detail ? buildHTML(detail) : buildNotFound();
+  let onKeyHandler = null;
+  let cancelled = false;
 
-  function onKey(e) {
-    if (e.key === 'Escape' || e.key === 'Backspace') navigate('home');
+  container.innerHTML = '<div style="padding:40px;color:var(--text-muted);text-align:center">Carregando...</div>';
+
+  function setupNav() {
+    function onKey(e) {
+      if (e.key === 'Escape' || e.key === 'Backspace') navigate('home');
+    }
+    container.querySelector('.detail-back')?.addEventListener('click', () => navigate('home'));
+    onKeyHandler = onKey;
+    document.addEventListener('keydown', onKey);
   }
 
-  container.querySelector('.detail-back')?.addEventListener('click', () => navigate('home'));
-  document.addEventListener('keydown', onKey);
-  return () => document.removeEventListener('keydown', onKey);
+  fetchGameDetail(params.gameId)
+    .then(detail => {
+      if (cancelled) return;
+      container.innerHTML = buildHTML(detail);
+      setupNav();
+    })
+    .catch(err => {
+      if (cancelled) return;
+      container.innerHTML = err.message.includes('404') ? buildNotFound() : buildError(err.message);
+      setupNav();
+    });
+
+  return () => {
+    cancelled = true;
+    if (onKeyHandler) document.removeEventListener('keydown', onKeyHandler);
+  };
 }
 
 function buildHTML(d) {
@@ -84,5 +104,12 @@ function buildNotFound() {
   return `<div class="screen-detail">
     <div class="detail-back">← Voltar</div>
     <p style="color:var(--text-muted);margin-top:40px">Jogo não encontrado.</p>
+  </div>`;
+}
+
+function buildError(msg) {
+  return `<div class="screen-detail">
+    <div class="detail-back">← Voltar</div>
+    <p style="color:var(--text-muted);margin-top:40px">Erro ao carregar jogo.<br><small>${msg}</small></p>
   </div>`;
 }
