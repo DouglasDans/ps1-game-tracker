@@ -31,6 +31,17 @@ def _ps1_item(label: str, path: str = "") -> dict:
     }
 
 
+def _megadrive_item(label: str, path: str = "") -> dict:
+    return {
+        "path": path or f"/mnt/roms/{label}.md",
+        "label": label,
+        "core_path": "DETECT",
+        "core_name": "DETECT",
+        "crc32": "00000000|crc",
+        "db_name": "Sega - Mega Drive - Genesis.lpl",
+    }
+
+
 # --- _parse_lrtl ---
 
 def test_parse_lrtl_extracts_runtime_and_last_played():
@@ -126,13 +137,13 @@ def test_platform_from_db_name_empty_returns_none():
 def test_load_playlist_map_returns_game_with_platform(tmp_path):
     _write_playlist(tmp_path, [_ps1_item("Ico")])
     result = _load_playlist_map([str(tmp_path)])
-    assert result.get("Ico") == "PS1"
+    assert result.get("ico") == "PS1"
 
 
 def test_load_playlist_map_normalizes_label(tmp_path):
     _write_playlist(tmp_path, [_ps1_item("Ico (USA)")])
     result = _load_playlist_map([str(tmp_path)])
-    assert result.get("Ico") == "PS1"
+    assert result.get("ico") == "PS1"
 
 
 def test_load_playlist_map_indexes_by_path_stem(tmp_path):
@@ -140,7 +151,7 @@ def test_load_playlist_map_indexes_by_path_stem(tmp_path):
     item["label"] = ""
     _write_playlist(tmp_path, [item])
     result = _load_playlist_map([str(tmp_path)])
-    assert result.get("Ico") == "PS1"
+    assert result.get("ico") == "PS1"
 
 
 def test_load_playlist_map_empty_dir(tmp_path):
@@ -224,6 +235,20 @@ def test_import_sessions_normalizes_canonical_name(conn, tmp_path):
 
     row = conn.execute("SELECT canonical_name FROM games").fetchone()
     assert row["canonical_name"] == "Ico"
+
+
+def test_import_sessions_resolves_platform_case_insensitive(conn, tmp_path):
+    logs_dir = tmp_path / "logs"
+    logs_dir.mkdir()
+    (logs_dir / "Sonic the Hedgehog 2 (World).lrtl").write_text(json.dumps(_LRTL))
+    (tmp_path / "Sega - Mega Drive - Genesis.lpl").write_text(
+        json.dumps({"version": "1.5", "items": [_megadrive_item("Sonic The Hedgehog 2 (World)")]})
+    )
+
+    import_sessions(conn, [str(tmp_path)])
+
+    row = conn.execute("SELECT platform FROM games").fetchone()
+    assert row["platform"] == "Mega Drive"
 
 
 def test_import_sessions_skips_zero_runtime(conn, tmp_path):

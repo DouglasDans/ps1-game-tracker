@@ -83,7 +83,7 @@ def _load_playlist_map(playlist_dirs: list[str]) -> dict[str, str]:
                 label = item.get("label") or Path(item.get("path", "")).stem
                 if not label:
                     continue
-                key = normalize_game_name(label)
+                key = normalize_game_name(label).lower()
                 if key:
                     result[key] = platform or ""
     return result
@@ -156,7 +156,7 @@ def _import_file(conn: sqlite3.Connection, lrtl_path: Path, playlist_map: dict[s
     if delta_s <= 0:
         return 0
 
-    platform = playlist_map.get(content_name) or None
+    platform = playlist_map.get(content_name.lower()) or None
     file_path = f"retroarch://{content_name}"
     game_id = upsert_game(conn, file_path, display_name=content_name, canonical_name=content_name, platform=platform)
     started_at = last_played - timedelta(seconds=delta_s)
@@ -178,10 +178,10 @@ def migrate_retroarch_games(conn: sqlite3.Connection, playlist_dirs: list[str]) 
         old_name = row["name"]
         new_name = normalize_game_name(old_name)
 
-        if new_name not in playlist_map:
+        if new_name.lower() not in playlist_map:
             continue
 
-        platform = playlist_map[new_name] or None
+        platform = playlist_map[new_name.lower()] or None
         new_file_path = f"retroarch://{new_name}"
 
         existing = conn.execute(
