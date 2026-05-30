@@ -110,6 +110,8 @@ ps1-game-tracker/
 │ igdb_id               INTEGER  ← mesmo id p/ CTTR PS2   │
 │ screenscraper_id      INTEGER    e CTTR PSP; agrupa UI   │
 │ ra_game_id            INTEGER  ← diferente por platform │
+│ enrichment_retries    INTEGER  ← falhas acumuladas;      │
+│                                   desiste em >= 3        │
 └────────────────────────┬────────────────────────────────┘
                          │ 1
                          │
@@ -203,7 +205,7 @@ O serviço usa `User=douglasdans` e `After=network.target`. Na Fase 2 (samba_wat
 | 1.5 — Metadados locais  | ✅     | display_name (Path.stem) + platform (por path/source); fix multi-track via select_preferred_rom |
 | 1.6 — Dedup multi-disco | ✅     | normalize_game_name strip all trailing `(...)` + canonical_name + session flip fix              |
 | 2 — Captura completa    | ✅     | samba_watcher (PS2) + lrtl_importer (RetroArch)                                                 |
-| 3 — Enriquecimento      | ⬜     | ScreenScraper → IGDB → regex fallback                                                           |
+| 3 — Enriquecimento      | ✅     | IGDB enricher (background thread, throttle, retry)                                              |
 | 4 — Frontend XMB        | ⬜     | Gamepad API + dark theme estilo XrossMediaBar                                                   |
 | 5 — Notion Sync         | ⬜     | Push sessão + cron diário                                                                       |
 | 6 — RetroAchievements   | ⬜     | Hash PS1 rcheevos-compatible + achievements + progresso                                         |
@@ -227,3 +229,5 @@ Confirmado em produção com DuckStation AppImage + PPSSPP:
 **Fase 1.6 concluída (2026-05-23):** `normalize_game_name` strip iterativo de todos os grupos `(...)` finais — região, versão, track, disco. `SessionManager` compara por `canonical_name` evitando session flip quando DuckStation alterna entre fds de tracks. `playtime_summary` agrega por `canonical_name`. Descoberta relevante: DuckStation não mantém `.cue` aberto — apenas os `.bin` dos tracks ficam nos fds.
 
 **Fase 2 concluída (2026-05-23):** `samba_watcher` parseia `smbstatus -L` para detectar ISOs PS2/OPL abertas via SMB (requer entrada no sudoers). `lrtl_importer` lê `.lrtl` do RetroArch e importa sessões por delta em relação ao acumulado já no DB — disparado no startup e quando o processo RetroArch encerra. Novos campos opcionais no config: `samba_rom_dirs`, `retroarch_playlist_dirs`, `samba_debounce_polls` (default 3 — OPL solta o lock brevemente durante boot). `strip_ps2_serial` em `session_manager.py` remove o prefixo serial OPL (`SLUS_NNN.NN.`) do display_name/canonical_name. `lrtl_importer` aplica `normalize_game_name` no stem do `.lrtl` para que histórico RetroArch e procfs agregem corretamente na `playtime_summary`.
+
+**Fase 3 concluída (2026-05-30):** `daemon/enricher.py` — IGDB como único enricher (ScreenScraper descartado). `enrich_game` busca por `canonical_name` + filtro de platform (PS1=7, PS2=8, PSP=38); plataformas não mapeadas buscam sem filtro. Thread de background com fila (`enricher_loop`): seeded no startup com todos os jogos `enriched_at IS NULL`, e enfileira novos jogos detectados pelo polling loop. Throttle de 0.3s entre requests para respeitar 4 req/s do IGDB. `RateLimitError` (429): não incrementa `enrichment_retries` — game re-enfileirado após sleep de 10s. Desiste após 3 boots com falha (`enrichment_retries >= 3`). Token Twitch cacheado em `igdb_token.json` ao lado do DB (~62 dias). Schema: campo `enrichment_retries INTEGER DEFAULT 0` adicionado via `ALTER TABLE`. Configurar no Pi: adicionar `[igdb]` com `client_id` e `client_secret` ao `config.toml`.
