@@ -8,7 +8,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
 from daemon.db import (
     crash_recovery,
@@ -219,12 +219,6 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="PS1 Game Tracker", lifespan=lifespan)
 
 
-@app.get("/")
-def index():
-    html = ROOT / "web" / "index.html"
-    return FileResponse(str(html))
-
-
 @app.get("/sessions/active")
 def active_session():
     return get_active_session(app.state.conn)
@@ -251,3 +245,6 @@ def game_detail(game_id: int):
 @app.get("/stats/summary")
 def stats_summary():
     return get_stats_summary(app.state.conn)
+
+
+app.mount("/", StaticFiles(directory=str(ROOT / "web"), html=True), name="static")
