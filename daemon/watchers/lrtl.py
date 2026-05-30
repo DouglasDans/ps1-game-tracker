@@ -13,6 +13,19 @@ _PLATFORM_MAP = {
     "Sony - PlayStation": "PS1",
     "Sony - PlayStation Portable": "PSP",
     "Sony - PlayStation 2": "PS2",
+    "Sony - PlayStation 3": "PS3",
+    "Nintendo - Super Nintendo Entertainment System": "SNES",
+    "Nintendo - Nintendo 64": "N64",
+    "Nintendo - Game Boy": "Game Boy",
+    "Nintendo - Game Boy Color": "GBC",
+    "Nintendo - Game Boy Advance": "GBA",
+    "Nintendo - Nintendo Entertainment System": "NES",
+    "Nintendo - GameCube": "GameCube",
+    "Sega - Mega Drive - Genesis": "Mega Drive",
+    "Sega - Master System - Mark III": "Master System",
+    "Sega - Saturn": "Saturn",
+    "Sega - Dreamcast": "Dreamcast",
+    "Sega - Game Gear": "Game Gear",
 }
 
 
@@ -20,7 +33,12 @@ def _platform_from_db_name(db_name: str) -> str | None:
     if not db_name:
         return None
     stem = db_name.removesuffix(".lpl")
-    return _PLATFORM_MAP.get(stem, stem)
+    if stem in _PLATFORM_MAP:
+        return _PLATFORM_MAP[stem]
+    # fallback: "Brand - Console" → "Console"
+    if " - " in stem:
+        return stem.split(" - ", 1)[1]
+    return stem
 
 
 def _load_playlist_map(playlist_dirs: list[str]) -> dict[str, str]:
@@ -105,15 +123,12 @@ def _import_file(conn: sqlite3.Connection, lrtl_path: Path, playlist_map: dict[s
         return 0
 
     content_name = normalize_game_name(lrtl_path.stem)
-    if content_name not in playlist_map:
-        return 0
-
     runtime_s, last_played = parsed
     delta_s = runtime_s - _known_runtime_s(conn, content_name)
     if delta_s <= 0:
         return 0
 
-    platform = playlist_map[content_name] or None
+    platform = playlist_map.get(content_name) or None
     file_path = f"retroarch://{content_name}"
     game_id = upsert_game(conn, file_path, display_name=content_name, canonical_name=content_name, platform=platform)
     started_at = last_played - timedelta(seconds=delta_s)

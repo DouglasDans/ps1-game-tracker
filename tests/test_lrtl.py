@@ -81,8 +81,20 @@ def test_platform_from_db_name_ps2():
     assert _platform_from_db_name("Sony - PlayStation 2.lpl") == "PS2"
 
 
-def test_platform_from_db_name_unknown_returns_raw_name():
-    assert _platform_from_db_name("Sega - Dreamcast.lpl") == "Sega - Dreamcast"
+def test_platform_from_db_name_dreamcast():
+    assert _platform_from_db_name("Sega - Dreamcast.lpl") == "Dreamcast"
+
+
+def test_platform_from_db_name_snes():
+    assert _platform_from_db_name("Nintendo - Super Nintendo Entertainment System.lpl") == "SNES"
+
+
+def test_platform_from_db_name_fallback_strips_brand():
+    assert _platform_from_db_name("Atari - 2600.lpl") == "2600"
+
+
+def test_platform_from_db_name_unknown_no_separator_returns_stem():
+    assert _platform_from_db_name("Unknown.lpl") == "Unknown"
 
 
 def test_platform_from_db_name_empty_returns_none():
@@ -126,7 +138,6 @@ def test_import_sessions_creates_session_for_new_content(conn, tmp_path):
     logs_dir = tmp_path / "logs"
     logs_dir.mkdir()
     (logs_dir / "Ico.lrtl").write_text(json.dumps(_LRTL))
-    _write_playlist(tmp_path, [_ps1_item("Ico")])
 
     n = import_sessions(conn, [str(tmp_path)])
 
@@ -150,22 +161,21 @@ def test_import_sessions_sets_platform_from_playlist(conn, tmp_path):
     assert row["platform"] == "PS1"
 
 
-def test_import_sessions_skips_game_not_in_playlist(conn, tmp_path):
+def test_import_sessions_imports_game_not_in_playlist(conn, tmp_path):
     logs_dir = tmp_path / "logs"
     logs_dir.mkdir()
     (logs_dir / "cube.lrtl").write_text(json.dumps(_LRTL))
 
     n = import_sessions(conn, [str(tmp_path)])
 
-    assert n == 0
-    assert conn.execute("SELECT COUNT(*) FROM sessions").fetchone()[0] == 0
+    assert n == 1
+    assert conn.execute("SELECT COUNT(*) FROM sessions").fetchone()[0] == 1
 
 
 def test_import_sessions_skips_already_imported(conn, tmp_path):
     logs_dir = tmp_path / "logs"
     logs_dir.mkdir()
     (logs_dir / "Ico.lrtl").write_text(json.dumps(_LRTL))
-    _write_playlist(tmp_path, [_ps1_item("Ico")])
 
     import_sessions(conn, [str(tmp_path)])
     n = import_sessions(conn, [str(tmp_path)])
@@ -182,7 +192,6 @@ def test_import_sessions_handles_corrupt_lrtl(conn, tmp_path):
     logs_dir = tmp_path / "logs"
     logs_dir.mkdir()
     (logs_dir / "Broken.lrtl").write_text("not valid json {{{")
-    _write_playlist(tmp_path, [_ps1_item("Broken")])
     assert import_sessions(conn, [str(tmp_path)]) == 0
 
 
@@ -190,7 +199,6 @@ def test_import_sessions_normalizes_canonical_name(conn, tmp_path):
     logs_dir = tmp_path / "logs"
     logs_dir.mkdir()
     (logs_dir / "Ico (USA).lrtl").write_text(json.dumps(_LRTL))
-    _write_playlist(tmp_path, [_ps1_item("Ico (USA)")])
 
     import_sessions(conn, [str(tmp_path)])
 
@@ -204,7 +212,6 @@ def test_import_sessions_skips_zero_runtime(conn, tmp_path):
     (logs_dir / "Empty.lrtl").write_text(
         json.dumps({"version": "1.0", "runtime": "0:00:00", "last_played": "2026-05-23 00:00:00"})
     )
-    _write_playlist(tmp_path, [_ps1_item("Empty")])
     assert import_sessions(conn, [str(tmp_path)]) == 0
 
 
