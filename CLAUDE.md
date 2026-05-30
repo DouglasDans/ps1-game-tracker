@@ -9,15 +9,15 @@ Acesso via MCP: `mcp__claude_ai_Notion__notion-fetch` com a URL acima.
 
 ## Stack
 
-| Camada | Tecnologia |
-|---|---|
-| Daemon + API | Python 3.11+ / FastAPI / asyncio |
-| Banco de dados | SQLite 3 (stdlib `sqlite3`) |
-| Enriquecimento | ScreenScraper API / IGDB API (Fase 3) |
-| Sync | Notion API / `notion-client` (Fase 5) |
-| Frontend | HTML5 / CSS3 / Vanilla JS |
-| Serviço | systemd (system service, `User=douglasdans`) |
-| Browser | Chromium kiosk via `cage` (Wayland) |
+| Camada         | Tecnologia                                   |
+| -------------- | -------------------------------------------- |
+| Daemon + API   | Python 3.11+ / FastAPI / asyncio             |
+| Banco de dados | SQLite 3 (stdlib `sqlite3`)                  |
+| Enriquecimento | ScreenScraper API / IGDB API (Fase 3)        |
+| Sync           | Notion API / `notion-client` (Fase 5)        |
+| Frontend       | HTML5 / CSS3 / Vanilla JS                    |
+| Serviço        | systemd (system service, `User=douglasdans`) |
+| Browser        | Chromium kiosk via `cage` (Wayland)          |
 
 ---
 
@@ -107,9 +107,9 @@ ps1-game-tracker/
 │ release_year          INTEGER                           │
 │ enriched_at           DATETIME                          │
 │ notion_page_id        TEXT                              │
-│ ra_game_id            INTEGER                           │
-│ ra_points_possible    INTEGER                           │
-│ ra_achievements_count INTEGER                           │
+│ igdb_id               INTEGER  ← mesmo id p/ CTTR PS2   │
+│ screenscraper_id      INTEGER    e CTTR PSP; agrupa UI   │
+│ ra_game_id            INTEGER  ← diferente por platform │
 └────────────────────────┬────────────────────────────────┘
                          │ 1
                          │
@@ -141,15 +141,19 @@ VIEW playtime_summary
 ## Arquitetura — decisões-chave
 
 ### Por que procfs para DuckStation?
+
 DuckStation tem `playtime.dat` interno, mas armazena apenas tempo total acumulado + timestamp do último acesso — sem granularidade de sessão. A única forma de capturar sessões individuais (start/end times) é via `/proc/PID/fd/`, detectando o file descriptor da ROM aberta.
 
 ### Por que SQLite como fonte da verdade?
+
 Zero latência, zero dependência de rede. Notion é espelho periódico para acesso remoto — falha de rede não quebra o tracking.
 
 ### RetroArch é diferente do DuckStation
+
 O `.lrtl` do RetroArch armazena dados por sessão com timestamps. O `lrtl_importer` (Fase 2) lê esses arquivos no encerramento do processo e importa para o SQLite. DuckStation não tem equivalente — procfs é obrigatório.
 
 ### Crash recovery
+
 Sessões sem `ended_at` com `heartbeat_at` > 5 minutos atrás são consideradas órfãs e fechadas no último `heartbeat_at` registrado.
 
 ---
@@ -193,30 +197,30 @@ O serviço usa `User=douglasdans` e `After=network.target`. Na Fase 2 (samba_wat
 
 ## Fases de implementação
 
-| Fase | Status | Escopo |
-|---|---|---|
-| 1 — Core | ✅ | SQLite + procfs_watcher + session_manager + API mínima |
-| 1.5 — Metadados locais | ✅ | display_name (Path.stem) + platform (por path/source); fix multi-track via select_preferred_rom |
-| 1.6 — Dedup multi-disco | ✅ | normalize_game_name strip all trailing `(...)` + canonical_name + session flip fix |
-| 2 — Captura completa | ✅ | samba_watcher (PS2) + lrtl_importer (RetroArch) |
-| 3 — Enriquecimento | ⬜ | ScreenScraper → IGDB → regex fallback |
-| 4 — Frontend XMB | ⬜ | Gamepad API + dark theme estilo XrossMediaBar |
-| 5 — Notion Sync | ⬜ | Push sessão + cron diário |
-| 6 — RetroAchievements | ⬜ | Hash PS1 rcheevos-compatible + achievements + progresso |
-| 7 — Produção | ⬜ | OSD Launcher integration + config completo |
+| Fase                    | Status | Escopo                                                                                          |
+| ----------------------- | ------ | ----------------------------------------------------------------------------------------------- |
+| 1 — Core                | ✅     | SQLite + procfs_watcher + session_manager + API mínima                                          |
+| 1.5 — Metadados locais  | ✅     | display_name (Path.stem) + platform (por path/source); fix multi-track via select_preferred_rom |
+| 1.6 — Dedup multi-disco | ✅     | normalize_game_name strip all trailing `(...)` + canonical_name + session flip fix              |
+| 2 — Captura completa    | ✅     | samba_watcher (PS2) + lrtl_importer (RetroArch)                                                 |
+| 3 — Enriquecimento      | ⬜     | ScreenScraper → IGDB → regex fallback                                                           |
+| 4 — Frontend XMB        | ⬜     | Gamepad API + dark theme estilo XrossMediaBar                                                   |
+| 5 — Notion Sync         | ⬜     | Push sessão + cron diário                                                                       |
+| 6 — RetroAchievements   | ⬜     | Hash PS1 rcheevos-compatible + achievements + progresso                                         |
+| 7 — Produção            | ⬜     | OSD Launcher integration + config completo                                                      |
 
 ### MVP validado no Pi (2026-05-23)
 
 Confirmado em produção com DuckStation AppImage + PPSSPP:
 
-| Jogo | Source | Resultado |
-|---|---|---|
-| CTR - Crash Team Racing | duckstation | ✅ detectado |
-| Gran Turismo 2 | duckstation | ✅ detectado |
-| Crash Bandicoot | duckstation | ✅ detectado |
-| Gran Turismo (PSP) | ppsspp | ✅ detectado |
-| Michael Jackson: The Experience | ppsspp | ✅ detectado |
-| vulkan_shaders.bin | — | ✅ filtrado pelo rom_dirs |
+| Jogo                            | Source      | Resultado                 |
+| ------------------------------- | ----------- | ------------------------- |
+| CTR - Crash Team Racing         | duckstation | ✅ detectado              |
+| Gran Turismo 2                  | duckstation | ✅ detectado              |
+| Crash Bandicoot                 | duckstation | ✅ detectado              |
+| Gran Turismo (PSP)              | ppsspp      | ✅ detectado              |
+| Michael Jackson: The Experience | ppsspp      | ✅ detectado              |
+| vulkan_shaders.bin              | —           | ✅ filtrado pelo rom_dirs |
 
 **Fase 1.5 concluída (2026-05-23):** `display_name` agora é o stem do filename; `platform` inferido por segmento de path (`/PS1/`, `/PSP/`) com fallback por source. Fix de multi-track: `select_preferred_rom()` em `procfs.py` garante `.chd > .cue > .bin` — evita flip de sessão quando múltiplos fds de faixa estão abertos.
 

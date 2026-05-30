@@ -4,19 +4,19 @@ import sqlite3
 def init_db(conn: sqlite3.Connection) -> None:
     conn.executescript("""
         CREATE TABLE IF NOT EXISTS games (
-            id                    INTEGER PRIMARY KEY,
-            file_path             TEXT UNIQUE NOT NULL,
-            file_md5              TEXT,
-            display_name          TEXT,
-            platform              TEXT,
-            cover_url             TEXT,
-            genre                 TEXT,
-            release_year          INTEGER,
-            enriched_at           DATETIME,
-            notion_page_id        TEXT,
-            ra_game_id            INTEGER,
-            ra_points_possible    INTEGER,
-            ra_achievements_count INTEGER
+            id               INTEGER PRIMARY KEY,
+            file_path        TEXT UNIQUE NOT NULL,
+            file_md5         TEXT,
+            display_name     TEXT,
+            platform         TEXT,
+            cover_url        TEXT,
+            genre            TEXT,
+            release_year     INTEGER,
+            enriched_at      DATETIME,
+            notion_page_id   TEXT,
+            igdb_id          INTEGER,
+            screenscraper_id INTEGER,
+            ra_game_id       INTEGER
         );
 
         CREATE TABLE IF NOT EXISTS sessions (
@@ -31,11 +31,16 @@ def init_db(conn: sqlite3.Connection) -> None:
             synced_to_notion INTEGER DEFAULT 0
         );
     """)
-    try:
-        conn.execute("ALTER TABLE games ADD COLUMN canonical_name TEXT")
-        conn.commit()
-    except Exception:
-        pass
+    for col, typedef in [
+        ("canonical_name", "TEXT"),
+        ("igdb_id", "INTEGER"),
+        ("screenscraper_id", "INTEGER"),
+    ]:
+        try:
+            conn.execute(f"ALTER TABLE games ADD COLUMN {col} {typedef}")
+            conn.commit()
+        except Exception:
+            pass
     conn.executescript("""
         DROP VIEW IF EXISTS playtime_summary;
         CREATE VIEW playtime_summary AS
