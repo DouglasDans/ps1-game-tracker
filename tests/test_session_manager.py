@@ -144,6 +144,23 @@ def test_normalize_leaves_plain_title_unchanged():
     assert normalize_game_name("Gran Turismo") == "Gran Turismo"
 
 
+def test_normalize_strips_bracket_tag():
+    assert normalize_game_name("Ico [!]") == "Ico"
+
+
+def test_normalize_strips_bracket_after_parens():
+    assert normalize_game_name("Game (USA) [!]") == "Game"
+
+
+def test_normalize_strips_no_intro_verbose_name():
+    assert (
+        normalize_game_name(
+            "Tony Hawk's Pro Skater 2 v1.001 (2000)(Activision)(NTSC)(US)[!]"
+        )
+        == "Tony Hawk's Pro Skater 2 v1.001"
+    )
+
+
 # --- strip_ps2_serial ---
 
 def test_strip_ps2_serial_removes_slus_prefix():

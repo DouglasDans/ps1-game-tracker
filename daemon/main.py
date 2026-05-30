@@ -11,7 +11,7 @@ from fastapi.responses import FileResponse
 
 from daemon.db import crash_recovery, get_active_session, get_games, init_db
 from daemon.session_manager import SessionManager
-from daemon.watchers.lrtl import import_sessions
+from daemon.watchers.lrtl import import_sessions, migrate_retroarch_games
 from daemon.watchers.procfs import poll as procfs_poll
 from daemon.watchers.samba import poll as samba_poll
 
@@ -132,6 +132,7 @@ async def lifespan(app: FastAPI):
 
     playlist_dirs = config["watchers"].get("retroarch_playlist_dirs", [])
     if playlist_dirs:
+        migrate_retroarch_games(conn, playlist_dirs)
         n = import_sessions(conn, playlist_dirs)
         if n:
             logger.info("lrtl startup import: %d session(s)", n)

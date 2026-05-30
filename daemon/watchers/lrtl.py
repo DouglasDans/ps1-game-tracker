@@ -9,6 +9,39 @@ from daemon.session_manager import normalize_game_name
 
 logger = logging.getLogger(__name__)
 
+_PLATFORM_MAP = {
+    "Sony - PlayStation": "PS1",
+    "Sony - PlayStation Portable": "PSP",
+    "Sony - PlayStation 2": "PS2",
+}
+
+
+def _platform_from_db_name(db_name: str) -> str | None:
+    if not db_name:
+        return None
+    stem = db_name.removesuffix(".lpl")
+    return _PLATFORM_MAP.get(stem, stem)
+
+
+def _load_playlist_map(playlist_dirs: list[str]) -> dict[str, str]:
+    result: dict[str, str] = {}
+    for d in playlist_dirs:
+        for lpl_path in Path(d).expanduser().glob("*.lpl"):
+            try:
+                data = json.loads(lpl_path.read_text())
+            except (OSError, json.JSONDecodeError):
+                logger.warning("Failed to parse playlist %s", lpl_path)
+                continue
+            platform = _platform_from_db_name(lpl_path.name)
+            for item in data.get("items", []):
+                label = item.get("label") or Path(item.get("path", "")).stem
+                if not label:
+                    continue
+                key = normalize_game_name(label)
+                if key:
+                    result[key] = platform or ""
+    return result
+
 
 def _parse_lrtl(data: dict) -> tuple[int, datetime] | None:
     # Real format: {"version": "1.0", "runtime": "H:MM:SS", "last_played": "YYYY-MM-DD HH:MM:SS"}
@@ -60,7 +93,7 @@ def _insert_historical_session(
     conn.commit()
 
 
-def _import_file(conn: sqlite3.Connection, lrtl_path: Path) -> int:
+def _import_file(conn: sqlite3.Connection, lrtl_path: Path, playlist_map: dict[str, str]) -> int:
     try:
         data = json.loads(lrtl_path.read_text())
     except (OSError, json.JSONDecodeError):
@@ -71,26 +104,74 @@ def _import_file(conn: sqlite3.Connection, lrtl_path: Path) -> int:
     if not parsed:
         return 0
 
-    runtime_s, last_played = parsed
     content_name = normalize_game_name(lrtl_path.stem)
+    if content_name not in playlist_map:
+        return 0
+
+    runtime_s, last_played = parsed
     delta_s = runtime_s - _known_runtime_s(conn, content_name)
     if delta_s <= 0:
         return 0
 
+    platform = playlist_map[content_name] or None
     file_path = f"retroarch://{content_name}"
-    game_id = upsert_game(conn, file_path, display_name=content_name, canonical_name=content_name)
+    game_id = upsert_game(conn, file_path, display_name=content_name, canonical_name=content_name, platform=platform)
     started_at = last_played - timedelta(seconds=delta_s)
     _insert_historical_session(conn, game_id, started_at, last_played, delta_s)
     logger.info("Imported RetroArch session: %s (%ds)", content_name, delta_s)
     return 1
 
 
+def migrate_retroarch_games(conn: sqlite3.Connection, playlist_dirs: list[str]) -> None:
+    playlist_map = _load_playlist_map(playlist_dirs)
+
+    rows = conn.execute(
+        "SELECT id, file_path, COALESCE(canonical_name, display_name) AS name FROM games "
+        "WHERE file_path LIKE 'retroarch://%'"
+    ).fetchall()
+
+    for row in rows:
+        game_id = row["id"]
+        old_name = row["name"]
+        new_name = normalize_game_name(old_name)
+
+        if new_name not in playlist_map:
+            conn.execute("DELETE FROM sessions WHERE game_id = ?", (game_id,))
+            conn.execute("DELETE FROM games WHERE id = ?", (game_id,))
+            conn.commit()
+            logger.info("Removed unlisted RetroArch game: %s", old_name)
+            continue
+
+        platform = playlist_map[new_name] or None
+        new_file_path = f"retroarch://{new_name}"
+
+        existing = conn.execute(
+            "SELECT id FROM games WHERE file_path = ? AND id != ?", (new_file_path, game_id)
+        ).fetchone()
+
+        if existing:
+            target_id = existing["id"]
+            conn.execute("UPDATE sessions SET game_id = ? WHERE game_id = ?", (target_id, game_id))
+            conn.execute("DELETE FROM games WHERE id = ?", (game_id,))
+            conn.execute("UPDATE games SET platform = COALESCE(platform, ?) WHERE id = ?", (platform, target_id))
+            conn.commit()
+            logger.info("Merged '%s' into existing game id=%d", old_name, target_id)
+        else:
+            conn.execute(
+                "UPDATE games SET file_path = ?, display_name = ?, canonical_name = ?, platform = COALESCE(platform, ?) WHERE id = ?",
+                (new_file_path, new_name, new_name, platform, game_id),
+            )
+            conn.commit()
+            logger.info("Migrated RetroArch game: '%s' → '%s'", old_name, new_name)
+
+
 def import_sessions(conn: sqlite3.Connection, playlist_dirs: list[str]) -> int:
+    playlist_map = _load_playlist_map(playlist_dirs)
     imported = 0
     for playlist_dir in playlist_dirs:
         logs_dir = Path(playlist_dir).expanduser() / "logs"
         if not logs_dir.exists():
             continue
         for lrtl_path in logs_dir.rglob("*.lrtl"):
-            imported += _import_file(conn, lrtl_path)
+            imported += _import_file(conn, lrtl_path, playlist_map)
     return imported

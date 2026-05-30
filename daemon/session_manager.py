@@ -7,6 +7,7 @@ from pathlib import Path
 from daemon.db import close_session, heartbeat, open_session, upsert_game
 
 _TRAILING_PARENS_RE = re.compile(r"\s*\([^)]*\)\s*$")
+_TRAILING_BRACKETS_RE = re.compile(r"\s*\[[^\]]*\]\s*$")
 _PS2_SERIAL_RE = re.compile(r"^[A-Z]{4}_\d{3}\.\d{2}\.(.+)$")
 
 
@@ -14,6 +15,7 @@ def normalize_game_name(stem: str) -> str:
     result = stem
     while True:
         stripped = _TRAILING_PARENS_RE.sub("", result).strip()
+        stripped = _TRAILING_BRACKETS_RE.sub("", stripped).strip()
         if stripped == result:
             return result
         result = stripped
