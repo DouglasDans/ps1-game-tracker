@@ -157,8 +157,24 @@ def test_normalize_strips_no_intro_verbose_name():
         normalize_game_name(
             "Tony Hawk's Pro Skater 2 v1.001 (2000)(Activision)(NTSC)(US)[!]"
         )
-        == "Tony Hawk's Pro Skater 2 v1.001"
+        == "Tony Hawk's Pro Skater 2"
     )
+
+
+def test_normalize_strips_bare_version_suffix():
+    assert normalize_game_name("Tony Hawk's Pro Skater 2 v1.001") == "Tony Hawk's Pro Skater 2"
+
+
+def test_normalize_strips_bare_version_v1000():
+    assert normalize_game_name("Looney Tunes Space Race v1.000") == "Looney Tunes Space Race"
+
+
+def test_normalize_strips_version_and_parens_iteratively():
+    assert normalize_game_name("Game v2.0 (USA)") == "Game"
+
+
+def test_normalize_does_not_strip_uppercase_v():
+    assert normalize_game_name("Grand Theft Auto V") == "Grand Theft Auto V"
 
 
 # --- strip_ps2_serial ---

@@ -12,7 +12,7 @@ from fastapi.responses import FileResponse
 
 from daemon.db import crash_recovery, get_active_session, get_games, get_unenriched_games, init_db
 from daemon.enricher import enricher_loop
-from daemon.session_manager import SessionManager
+from daemon.session_manager import SessionManager, normalize_game_name
 from daemon.watchers.lrtl import import_sessions, migrate_retroarch_games
 from daemon.watchers.procfs import poll as procfs_poll
 from daemon.watchers.samba import poll as samba_poll
@@ -65,6 +65,27 @@ def _is_retroarch_running() -> bool:
     except OSError:
         pass
     return False
+
+
+def _migrate_canonical_names(conn: sqlite3.Connection) -> None:
+    rows = conn.execute(
+        "SELECT id, canonical_name FROM games WHERE canonical_name IS NOT NULL"
+    ).fetchall()
+    updated = 0
+    for row in rows:
+        new_name = normalize_game_name(row["canonical_name"])
+        if new_name != row["canonical_name"]:
+            conn.execute(
+                """UPDATE games SET
+                       canonical_name = ?,
+                       enriched_at    = CASE WHEN cover_url IS NULL THEN NULL ELSE enriched_at END
+                   WHERE id = ?""",
+                (new_name, row["id"]),
+            )
+            updated += 1
+    if updated:
+        conn.commit()
+        logger.info("Migrated %d canonical name(s)", updated)
 
 
 def polling_loop(
@@ -142,6 +163,8 @@ async def lifespan(app: FastAPI):
     recovered = crash_recovery(conn)
     if recovered:
         logger.info("Crash recovery: closed %d orphaned session(s)", recovered)
+
+    _migrate_canonical_names(conn)
 
     playlist_dirs = config["watchers"].get("retroarch_playlist_dirs", [])
     if playlist_dirs:

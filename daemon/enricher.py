@@ -19,9 +19,56 @@ class RateLimitError(Exception):
 
 
 _IGDB_PLATFORM_IDS: dict[str, int] = {
+    # Sony
     "PS1": 7,
     "PS2": 8,
+    "PS3": 9,
+    "PS4": 48,
+    "PS5": 167,
     "PSP": 38,
+    "PS Vita": 46,
+    # Nintendo
+    "NES": 18,
+    "SNES": 19,
+    "N64": 4,
+    "GameCube": 21,
+    "Wii": 5,
+    "Wii U": 41,
+    "Switch": 130,
+    "Game Boy": 33,
+    "GBC": 22,
+    "GBA": 24,
+    "DS": 20,
+    "DSi": 159,
+    "3DS": 37,
+    "New 3DS": 137,
+    "Virtual Boy": 87,
+    # Sega
+    "Mega Drive": 29,
+    "Master System": 64,
+    "Saturn": 32,
+    "Dreamcast": 23,
+    "Game Gear": 35,
+    "32X": 30,
+    "Sega CD": 78,
+    # Others
+    "MSX": 27,
+    "MSX2": 53,
+    "Xbox": 11,
+    "Xbox 360": 12,
+    "Xbox One": 49,
+    "PC Engine": 86,
+    "PC Engine SuperGrafx": 128,
+    "Neo-Geo Pocket": 119,
+    "Neo-Geo Pocket Color": 120,
+    "WonderSwan": 57,
+    "WonderSwan Color": 123,
+    # Atari — lrtl usa fallback "Brand - Console" → só o console
+    "2600": 59,
+    "5200": 66,
+    "7800": 60,
+    "Jaguar": 62,
+    "Lynx": 61,
 }
 
 

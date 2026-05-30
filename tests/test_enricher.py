@@ -129,7 +129,7 @@ def test_igdb_search_omits_platform_filter_for_unknown_platform():
     mock_resp.raise_for_status = MagicMock()
 
     with patch("daemon.enricher.requests.post", return_value=mock_resp) as mock_post:
-        _igdb_search("Metal Gear Solid", "SNES", "tok", "cid")
+        _igdb_search("Metal Gear Solid", "Atari 2600", "tok", "cid")
 
     body = mock_post.call_args[1]["data"]
     assert "where" not in body

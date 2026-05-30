@@ -93,6 +93,26 @@ def test_platform_from_db_name_fallback_strips_brand():
     assert _platform_from_db_name("Atari - 2600.lpl") == "2600"
 
 
+def test_platform_from_db_name_ds():
+    assert _platform_from_db_name("Nintendo - Nintendo DS.lpl") == "DS"
+
+
+def test_platform_from_db_name_3ds():
+    assert _platform_from_db_name("Nintendo - Nintendo 3DS.lpl") == "3DS"
+
+
+def test_platform_from_db_name_ps_vita():
+    assert _platform_from_db_name("Sony - PlayStation Vita.lpl") == "PS Vita"
+
+
+def test_platform_from_db_name_wii():
+    assert _platform_from_db_name("Nintendo - Wii.lpl") == "Wii"
+
+
+def test_platform_from_db_name_switch():
+    assert _platform_from_db_name("Nintendo - Nintendo Switch.lpl") == "Switch"
+
+
 def test_platform_from_db_name_unknown_no_separator_returns_stem():
     assert _platform_from_db_name("Unknown.lpl") == "Unknown"
 
@@ -244,9 +264,9 @@ def test_migrate_normalizes_verbose_name(conn, tmp_path):
     migrate_retroarch_games(conn, [str(tmp_path)])
 
     row = conn.execute("SELECT file_path, display_name, canonical_name FROM games").fetchone()
-    assert row["display_name"] == "Tony Hawk's Pro Skater 2 v1.001"
-    assert row["canonical_name"] == "Tony Hawk's Pro Skater 2 v1.001"
-    assert row["file_path"] == "retroarch://Tony Hawk's Pro Skater 2 v1.001"
+    assert row["display_name"] == "Tony Hawk's Pro Skater 2"
+    assert row["canonical_name"] == "Tony Hawk's Pro Skater 2"
+    assert row["file_path"] == "retroarch://Tony Hawk's Pro Skater 2"
 
 
 def test_migrate_sets_platform_from_playlist(conn, tmp_path):

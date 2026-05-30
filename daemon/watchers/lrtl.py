@@ -10,22 +10,50 @@ from daemon.session_manager import normalize_game_name
 logger = logging.getLogger(__name__)
 
 _PLATFORM_MAP = {
+    # Sony
     "Sony - PlayStation": "PS1",
-    "Sony - PlayStation Portable": "PSP",
     "Sony - PlayStation 2": "PS2",
     "Sony - PlayStation 3": "PS3",
+    "Sony - PlayStation 4": "PS4",
+    "Sony - PlayStation 5": "PS5",
+    "Sony - PlayStation Portable": "PSP",
+    "Sony - PlayStation Vita": "PS Vita",
+    # Nintendo
+    "Nintendo - Nintendo Entertainment System": "NES",
     "Nintendo - Super Nintendo Entertainment System": "SNES",
     "Nintendo - Nintendo 64": "N64",
+    "Nintendo - GameCube": "GameCube",
+    "Nintendo - Wii": "Wii",
+    "Nintendo - Wii U": "Wii U",
+    "Nintendo - Nintendo Switch": "Switch",
     "Nintendo - Game Boy": "Game Boy",
     "Nintendo - Game Boy Color": "GBC",
     "Nintendo - Game Boy Advance": "GBA",
-    "Nintendo - Nintendo Entertainment System": "NES",
-    "Nintendo - GameCube": "GameCube",
+    "Nintendo - Nintendo DS": "DS",
+    "Nintendo - Nintendo DSi": "DSi",
+    "Nintendo - Nintendo 3DS": "3DS",
+    "Nintendo - New Nintendo 3DS": "New 3DS",
+    "Nintendo - Virtual Boy": "Virtual Boy",
+    # Sega
     "Sega - Mega Drive - Genesis": "Mega Drive",
     "Sega - Master System - Mark III": "Master System",
     "Sega - Saturn": "Saturn",
     "Sega - Dreamcast": "Dreamcast",
     "Sega - Game Gear": "Game Gear",
+    "Sega - 32X": "32X",
+    "Sega - CD": "Sega CD",
+    # Others
+    "Microsoft - MSX": "MSX",
+    "Microsoft - MSX2": "MSX2",
+    "Microsoft - Xbox": "Xbox",
+    "Microsoft - Xbox 360": "Xbox 360",
+    "Microsoft - Xbox One": "Xbox One",
+    "NEC - PC Engine - TurboGrafx 16": "PC Engine",
+    "NEC - PC Engine SuperGrafx": "PC Engine SuperGrafx",
+    "SNK - Neo-Geo Pocket": "Neo-Geo Pocket",
+    "SNK - Neo-Geo Pocket Color": "Neo-Geo Pocket Color",
+    "Bandai - WonderSwan": "WonderSwan",
+    "Bandai - WonderSwan Color": "WonderSwan Color",
 }
 
 
