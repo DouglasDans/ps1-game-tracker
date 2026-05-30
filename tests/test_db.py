@@ -6,6 +6,9 @@ from daemon.db import (
     crash_recovery,
     get_active_session,
     get_games,
+    get_unenriched_games,
+    update_game_enrichment,
+    increment_enrichment_retries,
 )
 
 
@@ -164,3 +167,53 @@ def test_get_games_aggregates_multi_track_playtime(conn):
     assert games[0]["display_name"] == "Dino Crisis"
     assert games[0]["total_seconds"] == 300
     assert games[0]["session_count"] == 2
+
+
+def test_get_unenriched_games_returns_unenriched(conn):
+    upsert_game(conn, "/roms/mgs.chd", "MGS", "PS1", "Metal Gear Solid")
+    games = get_unenriched_games(conn)
+    assert len(games) == 1
+    assert games[0]["file_path"] == "/roms/mgs.chd"
+
+
+def test_get_unenriched_games_skips_already_enriched(conn):
+    game_id = upsert_game(conn, "/roms/mgs.chd", "MGS", "PS1", "Metal Gear Solid")
+    update_game_enrichment(conn, game_id)
+    assert get_unenriched_games(conn) == []
+
+
+def test_get_unenriched_games_skips_exhausted_retries(conn):
+    game_id = upsert_game(conn, "/roms/mgs.chd", "MGS", "PS1", "Metal Gear Solid")
+    for _ in range(3):
+        increment_enrichment_retries(conn, game_id)
+    assert get_unenriched_games(conn) == []
+
+
+def test_update_game_enrichment_sets_enriched_at_and_fields(conn):
+    game_id = upsert_game(conn, "/roms/mgs.chd")
+    update_game_enrichment(conn, game_id, display_name="Metal Gear Solid", igdb_id=375, release_year=1998)
+    row = conn.execute(
+        "SELECT enriched_at, display_name, igdb_id, release_year FROM games WHERE id = ?",
+        (game_id,),
+    ).fetchone()
+    assert row["enriched_at"] is not None
+    assert row["display_name"] == "Metal Gear Solid"
+    assert row["igdb_id"] == 375
+    assert row["release_year"] == 1998
+
+
+def test_update_game_enrichment_does_not_overwrite_existing_values_with_none(conn):
+    game_id = upsert_game(conn, "/roms/mgs.chd", display_name="Old Name")
+    update_game_enrichment(conn, game_id, display_name=None)
+    row = conn.execute("SELECT display_name FROM games WHERE id = ?", (game_id,)).fetchone()
+    assert row["display_name"] == "Old Name"
+
+
+def test_increment_enrichment_retries(conn):
+    game_id = upsert_game(conn, "/roms/mgs.chd")
+    increment_enrichment_retries(conn, game_id)
+    increment_enrichment_retries(conn, game_id)
+    row = conn.execute(
+        "SELECT enrichment_retries FROM games WHERE id = ?", (game_id,)
+    ).fetchone()
+    assert row["enrichment_retries"] == 2

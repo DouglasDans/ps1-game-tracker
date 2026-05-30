@@ -19,6 +19,12 @@ samba_debounce_polls = 3
 # RetroArch — diretório de playlists para importar sessões via .lrtl
 retroarch_playlist_dirs = []  # ex: ["~/.config/retroarch/playlists"]
 
+[igdb]
+# Twitch developer app — https://dev.twitch.tv/console/apps
+# client_credentials grant: não requer login de usuário
+client_id     = ""
+client_secret = ""
+
 [retroachievements]
 enabled = false
 username = ""

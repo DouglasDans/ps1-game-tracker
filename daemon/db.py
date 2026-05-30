@@ -35,6 +35,7 @@ def init_db(conn: sqlite3.Connection) -> None:
         ("canonical_name", "TEXT"),
         ("igdb_id", "INTEGER"),
         ("screenscraper_id", "INTEGER"),
+        ("enrichment_retries", "INTEGER DEFAULT 0"),
     ]:
         try:
             conn.execute(f"ALTER TABLE games ADD COLUMN {col} {typedef}")
@@ -152,6 +153,50 @@ def get_active_session(conn: sqlite3.Connection) -> dict | None:
         """
     ).fetchone()
     return dict(row) if row else None
+
+
+def get_unenriched_games(conn: sqlite3.Connection) -> list[dict]:
+    rows = conn.execute(
+        "SELECT id, file_path, display_name, platform, canonical_name "
+        "FROM games WHERE enriched_at IS NULL AND enrichment_retries < 3"
+    ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def update_game_enrichment(
+    conn: sqlite3.Connection,
+    game_id: int,
+    *,
+    display_name: str | None = None,
+    cover_url: str | None = None,
+    genre: str | None = None,
+    release_year: int | None = None,
+    igdb_id: int | None = None,
+    screenscraper_id: int | None = None,
+) -> None:
+    conn.execute(
+        """
+        UPDATE games SET
+            display_name     = COALESCE(?, display_name),
+            cover_url        = COALESCE(?, cover_url),
+            genre            = COALESCE(?, genre),
+            release_year     = COALESCE(?, release_year),
+            igdb_id          = COALESCE(?, igdb_id),
+            screenscraper_id = COALESCE(?, screenscraper_id),
+            enriched_at      = datetime('now')
+        WHERE id = ?
+        """,
+        (display_name, cover_url, genre, release_year, igdb_id, screenscraper_id, game_id),
+    )
+    conn.commit()
+
+
+def increment_enrichment_retries(conn: sqlite3.Connection, game_id: int) -> None:
+    conn.execute(
+        "UPDATE games SET enrichment_retries = enrichment_retries + 1 WHERE id = ?",
+        (game_id,),
+    )
+    conn.commit()
 
 
 def get_games(conn: sqlite3.Connection) -> list[dict]:

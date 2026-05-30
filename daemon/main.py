@@ -1,4 +1,5 @@
 import logging
+import queue
 import sqlite3
 import threading
 import time
@@ -9,7 +10,8 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.responses import FileResponse
 
-from daemon.db import crash_recovery, get_active_session, get_games, init_db
+from daemon.db import crash_recovery, get_active_session, get_games, get_unenriched_games, init_db
+from daemon.enricher import enricher_loop
 from daemon.session_manager import SessionManager
 from daemon.watchers.lrtl import import_sessions, migrate_retroarch_games
 from daemon.watchers.procfs import poll as procfs_poll
@@ -70,6 +72,7 @@ def polling_loop(
     config: dict,
     stop: threading.Event,
     conn: sqlite3.Connection,
+    enrich_q: queue.Queue,
 ) -> None:
     process_names = config["watchers"]["process_names"]
     extensions = config["watchers"]["rom_extensions"]
@@ -82,6 +85,7 @@ def polling_loop(
     retroarch_was_running = False
     consecutive_misses = 0
     active_source: str | None = None
+    last_enqueued_path: str | None = None
 
     while not stop.is_set():
         try:
@@ -94,6 +98,15 @@ def polling_loop(
                 consecutive_misses = 0
                 active_source = source
                 manager.on_game_start(file_path, source)
+                if file_path != last_enqueued_path:
+                    row = conn.execute(
+                        "SELECT id, file_path, display_name, platform, canonical_name "
+                        "FROM games WHERE file_path = ? AND enriched_at IS NULL AND enrichment_retries < 3",
+                        (file_path,),
+                    ).fetchone()
+                    if row:
+                        enrich_q.put(dict(row))
+                    last_enqueued_path = file_path
             elif manager._active_session_id is not None:
                 consecutive_misses += 1
                 threshold = samba_debounce if active_source == "samba" else 1
@@ -139,21 +152,34 @@ async def lifespan(app: FastAPI):
 
     manager = SessionManager(conn)
     stop_event = threading.Event()
+    enrich_q: queue.Queue = queue.Queue()
     app.state.conn = conn
 
-    thread = threading.Thread(
+    for game in get_unenriched_games(conn):
+        enrich_q.put(game)
+    logger.info("Enrichment queue: %d game(s) pending", enrich_q.qsize())
+
+    poll_thread = threading.Thread(
         target=polling_loop,
-        args=(manager, config, stop_event, conn),
+        args=(manager, config, stop_event, conn, enrich_q),
         daemon=True,
         name="procfs-poller",
     )
-    thread.start()
+    enrich_thread = threading.Thread(
+        target=enricher_loop,
+        args=(conn, config, stop_event, enrich_q),
+        daemon=True,
+        name="enricher",
+    )
+    poll_thread.start()
+    enrich_thread.start()
     logger.info("Polling thread started (interval: %ss)", config["daemon"]["poll_interval_s"])
 
     yield
 
     stop_event.set()
-    thread.join(timeout=10)
+    poll_thread.join(timeout=10)
+    enrich_thread.join(timeout=10)
     conn.close()
     logger.info("Daemon stopped")
 
