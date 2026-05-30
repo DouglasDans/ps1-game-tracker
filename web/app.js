@@ -1,10 +1,8 @@
 import { mount as mountHome }    from './screens/home.js';
 import { mount as mountDetail }  from './screens/detail.js';
 import { mount as mountLibrary } from './screens/library.js';
-import { mount as mountStats }   from './screens/stats.js';
 
-const SCREENS = { home: mountHome, detail: mountDetail, library: mountLibrary, stats: mountStats };
-const NAV_SCREENS = ['home', 'stats'];
+const SCREENS = { home: mountHome, detail: mountDetail, library: mountLibrary };
 
 let currentCleanup = null;
 
@@ -68,18 +66,24 @@ function initGamepad() {
     requestAnimationFrame(pollGamepad);
   }
 
-  window.addEventListener('gamepadconnected', () => {
-    updateControllerStatus(true);
+  window.addEventListener('gamepadconnected', (e) => {
+    updateControllerStatus(true, e.gamepad.id);
     requestAnimationFrame(pollGamepad);
   });
   window.addEventListener('gamepaddisconnected', () => updateControllerStatus(false));
 }
 
-function updateControllerStatus(connected) {
+function updateControllerStatus(connected, id = '') {
   const dot  = document.querySelector('.status-dot.controller');
   const text = document.querySelector('.status-controller-text');
-  if (dot)  dot.style.opacity  = connected ? '1' : '0.3';
-  if (text) text.textContent   = connected ? 'Controle conectado' : 'Sem controle';
+  if (!dot || !text) return;
+  dot.style.opacity = connected ? '1' : '0.3';
+  if (connected) {
+    const name = id.split('(')[0].replace(/controller/i, '').trim();
+    text.textContent = name || 'Controle conectado';
+  } else {
+    text.textContent = 'Sem controle';
+  }
 }
 
 function init() {
@@ -121,6 +125,12 @@ function init() {
     el.addEventListener('click', () => {
       const screen = el.dataset.screen;
       if (screen === 'settings') return;
+      if (screen === 'stats') {
+        const section = document.getElementById('section-stats');
+        if (section) { section.scrollIntoView({ behavior: 'smooth' }); }
+        else { navigate('home', { scrollToStats: true }); }
+        return;
+      }
       navigate(screen);
     });
   });
