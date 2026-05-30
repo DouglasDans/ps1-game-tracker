@@ -7,10 +7,18 @@ import tomllib
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 
-from daemon.db import crash_recovery, get_active_session, get_games, get_unenriched_games, init_db
+from daemon.db import (
+    crash_recovery,
+    get_active_session,
+    get_game_detail,
+    get_games,
+    get_stats_summary,
+    get_unenriched_games,
+    init_db,
+)
 from daemon.enricher import enricher_loop
 from daemon.session_manager import SessionManager, normalize_game_name
 from daemon.watchers.lrtl import import_sessions, migrate_retroarch_games
@@ -224,3 +232,16 @@ def active_session():
 @app.get("/games")
 def games():
     return get_games(app.state.conn)
+
+
+@app.get("/games/{game_id}")
+def game_detail(game_id: int):
+    result = get_game_detail(app.state.conn, game_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Game not found")
+    return result
+
+
+@app.get("/stats/summary")
+def stats_summary():
+    return get_stats_summary(app.state.conn)

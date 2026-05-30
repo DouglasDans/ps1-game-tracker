@@ -199,6 +199,113 @@ def increment_enrichment_retries(conn: sqlite3.Connection, game_id: int) -> None
     conn.commit()
 
 
+def get_game_detail(conn: sqlite3.Connection, game_id: int) -> dict | None:
+    game = conn.execute(
+        "SELECT id, file_path, display_name, platform, cover_url, genre, release_year, igdb_id, canonical_name "
+        "FROM games WHERE id = ?",
+        (game_id,),
+    ).fetchone()
+    if not game:
+        return None
+
+    group_key = game["canonical_name"] or game["file_path"]
+
+    summary = conn.execute(
+        """
+        SELECT COUNT(s.id) AS session_count, COALESCE(SUM(s.duration_s), 0) AS total_seconds,
+               MAX(s.started_at) AS last_played
+        FROM sessions s
+        JOIN games g ON g.id = s.game_id
+        WHERE s.ended_at IS NOT NULL
+          AND COALESCE(g.canonical_name, g.file_path) = ?
+        """,
+        (group_key,),
+    ).fetchone()
+
+    sessions = conn.execute(
+        """
+        SELECT s.id, s.started_at, s.ended_at, s.duration_s, s.source
+        FROM sessions s
+        JOIN games g ON g.id = s.game_id
+        WHERE s.ended_at IS NOT NULL
+          AND COALESCE(g.canonical_name, g.file_path) = ?
+        ORDER BY s.started_at DESC
+        """,
+        (group_key,),
+    ).fetchall()
+
+    return {
+        "id": game_id,
+        "display_name": game["display_name"],
+        "platform": game["platform"],
+        "cover_url": game["cover_url"],
+        "genre": game["genre"],
+        "release_year": game["release_year"],
+        "igdb_id": game["igdb_id"],
+        "total_seconds": summary["total_seconds"],
+        "session_count": summary["session_count"],
+        "last_played": summary["last_played"],
+        "sessions": [dict(s) for s in sessions],
+    }
+
+
+def get_stats_summary(conn: sqlite3.Connection) -> dict:
+    totals = conn.execute(
+        """
+        SELECT COALESCE(SUM(s.duration_s), 0) AS total_seconds,
+               COUNT(DISTINCT COALESCE(g.canonical_name, g.file_path)) AS total_games
+        FROM sessions s
+        JOIN games g ON g.id = s.game_id
+        WHERE s.ended_at IS NOT NULL
+        """,
+    ).fetchone()
+
+    most_played = conn.execute(
+        "SELECT id, display_name, total_seconds FROM playtime_summary LIMIT 1"
+    ).fetchone()
+
+    longest = conn.execute(
+        """
+        SELECT s.duration_s, s.started_at,
+               COALESCE(g.canonical_name, g.display_name, g.file_path) AS display_name
+        FROM sessions s
+        JOIN games g ON g.id = s.game_id
+        WHERE s.ended_at IS NOT NULL AND s.duration_s IS NOT NULL
+        ORDER BY s.duration_s DESC
+        LIMIT 1
+        """,
+    ).fetchone()
+
+    total_secs = totals["total_seconds"]
+
+    by_platform = conn.execute(
+        """
+        SELECT COALESCE(g.platform, 'Outros') AS platform,
+               COALESCE(SUM(s.duration_s), 0) AS total_seconds
+        FROM sessions s
+        JOIN games g ON g.id = s.game_id
+        WHERE s.ended_at IS NOT NULL
+        GROUP BY COALESCE(g.platform, 'Outros')
+        ORDER BY total_seconds DESC
+        """,
+    ).fetchall()
+
+    return {
+        "total_seconds": total_secs,
+        "total_games": totals["total_games"],
+        "most_played": dict(most_played) if most_played else None,
+        "longest_session": dict(longest) if longest else None,
+        "by_platform": [
+            {
+                "platform": row["platform"],
+                "total_seconds": row["total_seconds"],
+                "pct": round(row["total_seconds"] * 100 / total_secs) if total_secs > 0 else 0,
+            }
+            for row in by_platform
+        ],
+    }
+
+
 def get_games(conn: sqlite3.Connection) -> list[dict]:
     rows = conn.execute(
         "SELECT id, file_path, display_name, platform, cover_url, "

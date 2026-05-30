@@ -5,7 +5,9 @@ from daemon.db import (
     heartbeat,
     crash_recovery,
     get_active_session,
+    get_game_detail,
     get_games,
+    get_stats_summary,
     get_unenriched_games,
     update_game_enrichment,
     increment_enrichment_retries,
@@ -217,3 +219,163 @@ def test_increment_enrichment_retries(conn):
         "SELECT enrichment_retries FROM games WHERE id = ?", (game_id,)
     ).fetchone()
     assert row["enrichment_retries"] == 2
+
+
+# --- get_game_detail ---
+
+def test_get_game_detail_returns_none_for_nonexistent_id(conn):
+    assert get_game_detail(conn, 999) is None
+
+
+def test_get_game_detail_returns_game_data(conn):
+    game_id = upsert_game(conn, "/roms/mgs.chd", "Metal Gear Solid", "PS1", "Metal Gear Solid")
+    update_game_enrichment(conn, game_id, genre="Action", release_year=1998)
+    session_id = open_session(conn, game_id, "duckstation")
+    close_session(conn, session_id)
+    conn.execute("UPDATE sessions SET duration_s = 3600 WHERE id = ?", (session_id,))
+    conn.commit()
+
+    result = get_game_detail(conn, game_id)
+    assert result is not None
+    assert result["display_name"] == "Metal Gear Solid"
+    assert result["platform"] == "PS1"
+    assert result["genre"] == "Action"
+    assert result["release_year"] == 1998
+    assert result["total_seconds"] == 3600
+    assert result["session_count"] == 1
+    assert len(result["sessions"]) == 1
+    assert result["sessions"][0]["source"] == "duckstation"
+    assert result["sessions"][0]["duration_s"] == 3600
+
+
+def test_get_game_detail_excludes_open_sessions(conn):
+    game_id = upsert_game(conn, "/roms/mgs.chd", "MGS", "PS1", "MGS")
+    open_session(conn, game_id, "duckstation")
+
+    result = get_game_detail(conn, game_id)
+    assert result is not None
+    assert result["session_count"] == 0
+    assert result["sessions"] == []
+
+
+def test_get_game_detail_aggregates_multi_track(conn):
+    id1 = upsert_game(conn, "/roms/CTR (Track 1).bin", "CTR", "PS1", "Crash Team Racing")
+    id2 = upsert_game(conn, "/roms/CTR (Track 2).bin", "CTR", "PS1", "Crash Team Racing")
+
+    s1 = open_session(conn, id1, "duckstation")
+    close_session(conn, s1)
+    conn.execute("UPDATE sessions SET duration_s = 1000 WHERE id = ?", (s1,))
+
+    s2 = open_session(conn, id2, "duckstation")
+    close_session(conn, s2)
+    conn.execute("UPDATE sessions SET duration_s = 2000 WHERE id = ?", (s2,))
+    conn.commit()
+
+    result = get_game_detail(conn, id1)
+    assert result["total_seconds"] == 3000
+    assert result["session_count"] == 2
+    assert len(result["sessions"]) == 2
+
+
+def test_get_game_detail_sessions_ordered_newest_first(conn):
+    game_id = upsert_game(conn, "/roms/mgs.chd", "MGS", "PS1", "MGS")
+
+    s1 = open_session(conn, game_id, "duckstation")
+    close_session(conn, s1)
+    conn.execute(
+        "UPDATE sessions SET started_at = '2026-01-01 10:00:00', duration_s = 100 WHERE id = ?",
+        (s1,),
+    )
+    s2 = open_session(conn, game_id, "duckstation")
+    close_session(conn, s2)
+    conn.execute(
+        "UPDATE sessions SET started_at = '2026-02-01 10:00:00', duration_s = 200 WHERE id = ?",
+        (s2,),
+    )
+    conn.commit()
+
+    result = get_game_detail(conn, game_id)
+    assert result["sessions"][0]["started_at"] == "2026-02-01 10:00:00"
+    assert result["sessions"][1]["started_at"] == "2026-01-01 10:00:00"
+
+
+# --- get_stats_summary ---
+
+def test_get_stats_summary_empty_db(conn):
+    result = get_stats_summary(conn)
+    assert result["total_seconds"] == 0
+    assert result["total_games"] == 0
+    assert result["most_played"] is None
+    assert result["longest_session"] is None
+    assert result["by_platform"] == []
+
+
+def test_get_stats_summary_total_seconds(conn):
+    id1 = upsert_game(conn, "/roms/mgs.chd", "MGS", "PS1", "MGS")
+    id2 = upsert_game(conn, "/roms/ctr.chd", "CTR", "PS1", "CTR")
+
+    s1 = open_session(conn, id1, "duckstation")
+    close_session(conn, s1)
+    conn.execute("UPDATE sessions SET duration_s = 1000 WHERE id = ?", (s1,))
+    s2 = open_session(conn, id2, "duckstation")
+    close_session(conn, s2)
+    conn.execute("UPDATE sessions SET duration_s = 2000 WHERE id = ?", (s2,))
+    conn.commit()
+
+    result = get_stats_summary(conn)
+    assert result["total_seconds"] == 3000
+    assert result["total_games"] == 2
+
+
+def test_get_stats_summary_most_played(conn):
+    id1 = upsert_game(conn, "/roms/mgs.chd", "Metal Gear Solid", "PS1", "Metal Gear Solid")
+    id2 = upsert_game(conn, "/roms/ctr.chd", "Crash Team Racing", "PS1", "Crash Team Racing")
+
+    s1 = open_session(conn, id1, "duckstation")
+    close_session(conn, s1)
+    conn.execute("UPDATE sessions SET duration_s = 5000 WHERE id = ?", (s1,))
+    s2 = open_session(conn, id2, "duckstation")
+    close_session(conn, s2)
+    conn.execute("UPDATE sessions SET duration_s = 1000 WHERE id = ?", (s2,))
+    conn.commit()
+
+    result = get_stats_summary(conn)
+    assert result["most_played"]["display_name"] == "Metal Gear Solid"
+    assert result["most_played"]["total_seconds"] == 5000
+
+
+def test_get_stats_summary_longest_session(conn):
+    id1 = upsert_game(conn, "/roms/mgs.chd", "Metal Gear Solid", "PS1", "Metal Gear Solid")
+    id2 = upsert_game(conn, "/roms/ctr.chd", "Crash Team Racing", "PS1", "Crash Team Racing")
+
+    s1 = open_session(conn, id1, "duckstation")
+    close_session(conn, s1)
+    conn.execute("UPDATE sessions SET duration_s = 500 WHERE id = ?", (s1,))
+    s2 = open_session(conn, id2, "duckstation")
+    close_session(conn, s2)
+    conn.execute("UPDATE sessions SET duration_s = 9000 WHERE id = ?", (s2,))
+    conn.commit()
+
+    result = get_stats_summary(conn)
+    assert result["longest_session"]["duration_s"] == 9000
+    assert result["longest_session"]["display_name"] == "Crash Team Racing"
+
+
+def test_get_stats_summary_by_platform(conn):
+    id1 = upsert_game(conn, "/roms/mgs.chd", "MGS", "PS1", "MGS")
+    id2 = upsert_game(conn, "/roms/gt2.chd", "GT2", "PS2", "GT2")
+
+    s1 = open_session(conn, id1, "duckstation")
+    close_session(conn, s1)
+    conn.execute("UPDATE sessions SET duration_s = 6000 WHERE id = ?", (s1,))
+    s2 = open_session(conn, id2, "samba")
+    close_session(conn, s2)
+    conn.execute("UPDATE sessions SET duration_s = 4000 WHERE id = ?", (s2,))
+    conn.commit()
+
+    result = get_stats_summary(conn)
+    platforms = {p["platform"]: p for p in result["by_platform"]}
+    assert platforms["PS1"]["total_seconds"] == 6000
+    assert platforms["PS1"]["pct"] == 60
+    assert platforms["PS2"]["total_seconds"] == 4000
+    assert platforms["PS2"]["pct"] == 40
