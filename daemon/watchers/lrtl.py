@@ -169,7 +169,7 @@ def migrate_retroarch_games(conn: sqlite3.Connection, playlist_dirs: list[str]) 
             logger.info("Merged '%s' into existing game id=%d", old_name, target_id)
         else:
             conn.execute(
-                "UPDATE games SET file_path = ?, display_name = ?, canonical_name = ?, platform = COALESCE(platform, ?) WHERE id = ?",
+                "UPDATE games SET file_path = ?, display_name = ?, canonical_name = ?, platform = ? WHERE id = ?",
                 (new_file_path, new_name, new_name, platform, game_id),
             )
             conn.commit()
