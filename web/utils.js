@@ -2,6 +2,7 @@ export const PLATFORM_LOGO = {
   PS1: '/assets/ps1.svg',
   PS2: '/assets/ps2.svg',
   PSP: '/assets/psp.png',
+  Dreamcast: '/assets/dc.png',
 };
 
 export const SOURCE_LABEL = {
