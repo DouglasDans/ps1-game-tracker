@@ -164,6 +164,23 @@ def get_active_session(conn: sqlite3.Connection) -> dict | None:
     return dict(row) if row else None
 
 
+def reset_all_enrichment(conn: sqlite3.Connection) -> int:
+    cursor = conn.execute(
+        """
+        UPDATE games SET
+            enriched_at        = NULL,
+            enrichment_retries = 0,
+            cover_url          = NULL,
+            igdb_id            = NULL,
+            screenscraper_id   = NULL,
+            display_name       = COALESCE(canonical_name, display_name)
+        WHERE enriched_at IS NOT NULL OR enrichment_retries > 0
+        """
+    )
+    conn.commit()
+    return cursor.rowcount
+
+
 def get_unenriched_games(conn: sqlite3.Connection) -> list[dict]:
     rows = conn.execute(
         "SELECT id, file_path, display_name, platform, canonical_name "

@@ -122,7 +122,7 @@ def _igdb_search(
     query = f'search "{canonical_name}"; fields name,genres.name,cover.image_id,first_release_date; '
     if platform_id:
         query += f"where platforms = ({platform_id}); "
-    query += "limit 1;"
+    query += "limit 5;"
 
     resp = requests.post(
         "https://api.igdb.com/v4/games",
@@ -139,7 +139,8 @@ def _igdb_search(
     if not results:
         return None
 
-    game = results[0]
+    canonical_lower = canonical_name.lower()
+    game = next((r for r in results if r["name"].lower() == canonical_lower), results[0])
     cover_url = None
     if "cover" in game:
         cover_url = f"https://images.igdb.com/igdb/image/upload/t_cover_big/{game['cover']['image_id']}.jpg"

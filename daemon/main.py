@@ -20,6 +20,7 @@ from daemon.db import (
     get_stats_summary,
     get_unenriched_games,
     init_db,
+    reset_all_enrichment,
 )
 from daemon.enricher import enricher_loop
 from daemon.session_manager import SessionManager, normalize_game_name
@@ -187,6 +188,7 @@ async def lifespan(app: FastAPI):
     stop_event = threading.Event()
     enrich_q: queue.Queue = queue.Queue()
     app.state.conn = conn
+    app.state.enrich_q = enrich_q
 
     for game in get_unenriched_games(conn):
         enrich_q.put(game)
@@ -218,7 +220,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="PS1 Game Tracker", lifespan=lifespan)
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["GET"])
+app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["GET", "POST"])
 
 
 @app.get("/sessions/active")
@@ -247,6 +249,16 @@ def game_detail(game_id: int):
 @app.get("/stats/summary")
 def stats_summary():
     return get_stats_summary(app.state.conn)
+
+
+@app.post("/admin/reset-enrichment")
+def admin_reset_enrichment():
+    conn = app.state.conn
+    n = reset_all_enrichment(conn)
+    for game in get_unenriched_games(conn):
+        app.state.enrich_q.put(game)
+    queued = app.state.enrich_q.qsize()
+    return {"reset": n, "queued": queued}
 
 
 app.mount("/", StaticFiles(directory=str(ROOT / "web"), html=True), name="static")
