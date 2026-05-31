@@ -238,12 +238,44 @@ def get_game_detail(conn: sqlite3.Connection, game_id: int) -> dict | None:
 
     summary = conn.execute(
         """
-        SELECT COUNT(s.id) AS session_count, COALESCE(SUM(s.duration_s), 0) AS total_seconds,
-               MAX(s.started_at) AS last_played
+        SELECT COUNT(s.id) AS session_count,
+               COALESCE(SUM(s.duration_s), 0) AS total_seconds,
+               MAX(s.started_at) AS last_played,
+               MIN(s.started_at) AS first_played,
+               CASE WHEN COUNT(s.id) > 0 THEN AVG(s.duration_s) ELSE NULL END AS avg_session_s,
+               MAX(s.duration_s) AS longest_session_s
         FROM sessions s
         JOIN games g ON g.id = s.game_id
         WHERE s.ended_at IS NOT NULL
           AND COALESCE(g.canonical_name, g.file_path) = ?
+        """,
+        (group_key,),
+    ).fetchone()
+
+    longest_row = conn.execute(
+        """
+        SELECT DATE(s.started_at) AS day
+        FROM sessions s
+        JOIN games g ON g.id = s.game_id
+        WHERE s.ended_at IS NOT NULL
+          AND s.duration_s IS NOT NULL
+          AND COALESCE(g.canonical_name, g.file_path) = ?
+        ORDER BY s.duration_s DESC
+        LIMIT 1
+        """,
+        (group_key,),
+    ).fetchone()
+
+    best_day_row = conn.execute(
+        """
+        SELECT DATE(s.started_at) AS day, SUM(s.duration_s) AS total
+        FROM sessions s
+        JOIN games g ON g.id = s.game_id
+        WHERE s.ended_at IS NOT NULL
+          AND COALESCE(g.canonical_name, g.file_path) = ?
+        GROUP BY DATE(s.started_at)
+        ORDER BY total DESC
+        LIMIT 1
         """,
         (group_key,),
     ).fetchone()
@@ -271,6 +303,12 @@ def get_game_detail(conn: sqlite3.Connection, game_id: int) -> dict | None:
         "total_seconds": summary["total_seconds"],
         "session_count": summary["session_count"],
         "last_played": summary["last_played"],
+        "first_played": summary["first_played"],
+        "avg_session_s": summary["avg_session_s"],
+        "longest_session_s": summary["longest_session_s"],
+        "longest_session_date": longest_row["day"] if longest_row else None,
+        "best_day": best_day_row["day"] if best_day_row else None,
+        "best_day_total_s": best_day_row["total"] if best_day_row else None,
         "sessions": [dict(s) for s in sessions],
     }
 

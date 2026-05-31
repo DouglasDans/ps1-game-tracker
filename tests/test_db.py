@@ -300,6 +300,105 @@ def test_get_game_detail_sessions_ordered_newest_first(conn):
     assert result["sessions"][1]["started_at"] == "2026-01-01 10:00:00"
 
 
+def test_get_game_detail_avg_session_s(conn):
+    game_id = upsert_game(conn, "/roms/mgs.chd", "MGS", "PS1", "MGS")
+
+    s1 = open_session(conn, game_id, "duckstation")
+    close_session(conn, s1)
+    conn.execute("UPDATE sessions SET duration_s = 1000 WHERE id = ?", (s1,))
+
+    s2 = open_session(conn, game_id, "duckstation")
+    close_session(conn, s2)
+    conn.execute("UPDATE sessions SET duration_s = 3000 WHERE id = ?", (s2,))
+    conn.commit()
+
+    result = get_game_detail(conn, game_id)
+    assert result["avg_session_s"] == 2000
+
+
+def test_get_game_detail_avg_session_s_none_when_no_sessions(conn):
+    game_id = upsert_game(conn, "/roms/mgs.chd", "MGS", "PS1", "MGS")
+    result = get_game_detail(conn, game_id)
+    assert result["avg_session_s"] is None
+
+
+def test_get_game_detail_longest_session(conn):
+    game_id = upsert_game(conn, "/roms/mgs.chd", "MGS", "PS1", "MGS")
+
+    s1 = open_session(conn, game_id, "duckstation")
+    close_session(conn, s1)
+    conn.execute(
+        "UPDATE sessions SET started_at = '2026-01-10 10:00:00', duration_s = 500 WHERE id = ?",
+        (s1,),
+    )
+
+    s2 = open_session(conn, game_id, "duckstation")
+    close_session(conn, s2)
+    conn.execute(
+        "UPDATE sessions SET started_at = '2026-02-15 10:00:00', duration_s = 7200 WHERE id = ?",
+        (s2,),
+    )
+    conn.commit()
+
+    result = get_game_detail(conn, game_id)
+    assert result["longest_session_s"] == 7200
+    assert result["longest_session_date"] == "2026-02-15"
+
+
+def test_get_game_detail_first_played(conn):
+    game_id = upsert_game(conn, "/roms/mgs.chd", "MGS", "PS1", "MGS")
+
+    s1 = open_session(conn, game_id, "duckstation")
+    close_session(conn, s1)
+    conn.execute(
+        "UPDATE sessions SET started_at = '2026-03-01 10:00:00', duration_s = 100 WHERE id = ?",
+        (s1,),
+    )
+
+    s2 = open_session(conn, game_id, "duckstation")
+    close_session(conn, s2)
+    conn.execute(
+        "UPDATE sessions SET started_at = '2026-01-05 10:00:00', duration_s = 200 WHERE id = ?",
+        (s2,),
+    )
+    conn.commit()
+
+    result = get_game_detail(conn, game_id)
+    assert result["first_played"] == "2026-01-05 10:00:00"
+
+
+def test_get_game_detail_best_day(conn):
+    game_id = upsert_game(conn, "/roms/mgs.chd", "MGS", "PS1", "MGS")
+
+    # Dia 2026-01-10: 2 sessões = 1000 + 500 = 1500s
+    s1 = open_session(conn, game_id, "duckstation")
+    close_session(conn, s1)
+    conn.execute(
+        "UPDATE sessions SET started_at = '2026-01-10 09:00:00', duration_s = 1000 WHERE id = ?",
+        (s1,),
+    )
+
+    s2 = open_session(conn, game_id, "duckstation")
+    close_session(conn, s2)
+    conn.execute(
+        "UPDATE sessions SET started_at = '2026-01-10 14:00:00', duration_s = 500 WHERE id = ?",
+        (s2,),
+    )
+
+    # Dia 2026-02-05: 1 sessão = 1200s
+    s3 = open_session(conn, game_id, "duckstation")
+    close_session(conn, s3)
+    conn.execute(
+        "UPDATE sessions SET started_at = '2026-02-05 20:00:00', duration_s = 1200 WHERE id = ?",
+        (s3,),
+    )
+    conn.commit()
+
+    result = get_game_detail(conn, game_id)
+    assert result["best_day"] == "2026-01-10"
+    assert result["best_day_total_s"] == 1500
+
+
 # --- get_stats_summary ---
 
 def test_get_stats_summary_empty_db(conn):
