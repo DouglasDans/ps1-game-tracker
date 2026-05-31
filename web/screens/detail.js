@@ -1,5 +1,5 @@
 import { fetchGameDetail } from '../data/api.js';
-import { fmtTime, fmtDate, fmtSource, cardGradient, platformLogoImg, PLATFORM_LOGO } from '../utils.js';
+import { fmtTime, fmtDate, fmtSource, cardGradient, platformLogoImg, getPlatformLogo } from '../utils.js';
 
 export function mount(container, navigate, params = {}) {
   let onKeyHandler = null;
@@ -39,7 +39,7 @@ export function mount(container, navigate, params = {}) {
 }
 
 function buildHTML(d) {
-  const logo = PLATFORM_LOGO[d.platform];
+  const logo = getPlatformLogo(d.platform);
   const cover = d.cover_url
     ? `<img src="${d.cover_url}" alt="" style="width:100%;height:100%;object-fit:cover">`
     : `<div class="cover-gradient" style="background:${cardGradient(d.display_name)};width:100%;height:100%;display:flex;align-items:flex-end;padding:12px">

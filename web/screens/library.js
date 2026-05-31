@@ -1,5 +1,5 @@
 import { fetchGames } from '../data/api.js';
-import { fmtTime, cardGradient, PLATFORM_LOGO } from '../utils.js';
+import { fmtTime, cardGradient, getPlatformLogo } from '../utils.js';
 
 function computeCols(container) {
   const cards = container.querySelectorAll('.lib-card');
@@ -186,7 +186,6 @@ function buildHTML(allGames, games, selectedIndex, platformFilter) {
 
 function gridHTML(games, selectedIndex) {
   return games.map((g, i) => {
-    const logo = PLATFORM_LOGO[g.platform];
     const cover = g.cover_url
       ? `<img src="${g.cover_url}" alt="" class="cover-img">`
       : `<div class="cover-gradient" style="background:${cardGradient(g.display_name)};width:100%;height:100%;display:flex;align-items:flex-end;padding:10px">
@@ -195,7 +194,6 @@ function gridHTML(games, selectedIndex) {
     return `<div class="lib-card${i === selectedIndex ? ' selected' : ''}" data-id="${g.id}">
       <div class="lib-card-cover">
         ${cover}
-        ${logo ? `<div class="card-platform-badge"><img src="${logo}" alt="${g.platform}"></div>` : ''}
       </div>
       <div class="lib-card-name">${g.display_name}</div>
       <div class="lib-card-time">${fmtTime(g.total_seconds)}</div>

@@ -1,5 +1,5 @@
 import { fetchGames, fetchActiveSession, fetchStats } from '../data/api.js';
-import { fmtTime, fmtDate, fmtDateShort, fmtSource, cardGradient, platformLogoImg, PLATFORM_LOGO } from '../utils.js';
+import { fmtTime, fmtDate, fmtDateShort, fmtSource, cardGradient, platformLogoImg } from '../utils.js';
 
 const CARD_W   = 130;
 const CARD_GAP = 14;
@@ -105,7 +105,6 @@ function buildHTML(items, selectedIndex, active, stats, games) {
       </div>`;
     }
     const isActive = active && item.id === active.game_id;
-    const logo = PLATFORM_LOGO[item.platform];
     const cover = item.cover_url
       ? `<img src="${item.cover_url}" alt="" class="cover-img">`
       : `<div class="cover-gradient" style="background:${cardGradient(item.display_name)}">
@@ -113,7 +112,6 @@ function buildHTML(items, selectedIndex, active, stats, games) {
          </div>`;
     return `<div class="game-card${sel}${isActive ? ' has-active' : ''}" data-idx="${i}" data-id="${item.id}">
       ${cover}
-      ${logo ? `<div class="card-platform-badge"><img src="${logo}" alt="${item.platform}"></div>` : ''}
       <div class="card-active-dot"></div>
     </div>`;
   }).join('');
@@ -165,11 +163,9 @@ function buildStatsHTML(stats, games) {
     </div>`).join('');
 
   const topList = topGames.map((g, i) => {
-    const logo = PLATFORM_LOGO[g.platform];
     return `<div class="top-game-row">
       <span class="top-game-rank">${i + 1}</span>
       <div class="top-game-cover" style="background:${cardGradient(g.display_name)}">
-        ${logo ? `<img src="${logo}" alt="${g.platform}" class="top-game-platform-logo">` : ''}
       </div>
       <div class="top-game-info">
         <div class="top-game-name">${g.display_name}</div>
