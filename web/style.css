@@ -13,8 +13,8 @@
   --accent: #0070d1;
   --accent-glow: rgba(0, 112, 209, 0.3);
   --text: #f0f0f8;
-  --text-dim: #9090b0;
-  --text-muted: #44445a;
+  --text-dim: #ababc8;
+  --text-muted: #646488;
   --radius: 8px;
   --card-w: 130px;
   --card-h: 188px;
@@ -36,7 +36,7 @@ body {
     system-ui,
     -apple-system,
     sans-serif;
-  font-size: 16px;
+  font-size: 18px;
 }
 
 /* ── Root layout ── */
@@ -131,7 +131,7 @@ body {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 0.65rem;
+  font-size: 0.72rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--text-muted);
@@ -145,7 +145,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.6rem;
+  font-size: 0.68rem;
   font-weight: 700;
   flex-shrink: 0;
   color: var(--text-muted);
@@ -161,7 +161,7 @@ body {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 0.65rem;
+  font-size: 0.72rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--text-muted);
@@ -208,7 +208,7 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 0.62rem;
+  font-size: 0.68rem;
   font-weight: 600;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -335,7 +335,7 @@ body {
 }
 
 .badge {
-  font-size: 0.6rem;
+  font-size: 0.65rem;
   font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -407,7 +407,7 @@ body {
 }
 
 .stat-label {
-  font-size: 0.6rem;
+  font-size: 0.68rem;
   font-weight: 600;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -540,7 +540,7 @@ body {
 }
 
 .card-library-inner {
-  font-size: 0.62rem;
+  font-size: 0.68rem;
   font-weight: 700;
   letter-spacing: 0.15em;
   text-transform: uppercase;
@@ -659,7 +659,7 @@ body {
 }
 
 .detail-extra-stat .stat-label {
-  font-size: 0.58rem;
+  font-size: 0.65rem;
 }
 
 .detail-extra-stat .stat-value {
@@ -678,7 +678,7 @@ body {
   display: flex;
   align-items: center;
   gap: 12px;
-  font-size: 0.62rem;
+  font-size: 0.68rem;
   font-weight: 700;
   letter-spacing: 0.15em;
   text-transform: uppercase;
@@ -860,7 +860,7 @@ body {
 }
 
 .stats-card-label {
-  font-size: 0.6rem;
+  font-size: 0.68rem;
   font-weight: 600;
   letter-spacing: 0.12em;
   text-transform: uppercase;
