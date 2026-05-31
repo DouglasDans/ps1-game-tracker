@@ -1,5 +1,5 @@
 import { fetchGameDetail } from '../data/api.js';
-import { fmtTime, fmtDate, fmtSource, cardGradient, platformLogoImg, getPlatformLogo } from '../utils.js';
+import { fmtTime, fmtDate, fmtDateShort, fmtSource, cardGradient, platformLogoImg, getPlatformLogo } from '../utils.js';
 
 export function mount(container, navigate, params = {}) {
   let onKeyHandler = null;
@@ -91,6 +91,34 @@ function buildHTML(d) {
     </div>
 
     <div>
+      <div class="section-header">Estatísticas</div>
+      <div class="detail-extra-stats">
+        <div class="detail-extra-stat">
+          <div class="stat-label">Média por sessão</div>
+          <div class="stat-value">${fmtTime(d.avg_session_s ? Math.round(d.avg_session_s) : null)}</div>
+        </div>
+        <div class="detail-extra-stat">
+          <div class="stat-label">Sessão mais longa</div>
+          <div class="stat-value">${fmtTime(d.longest_session_s)}</div>
+          ${d.longest_session_date ? `<div class="stat-sub">${fmtDayDate(d.longest_session_date)}</div>` : ''}
+        </div>
+        <div class="detail-extra-stat">
+          <div class="stat-label">Melhor dia</div>
+          <div class="stat-value">${fmtDayDate(d.best_day)}</div>
+          ${d.best_day_total_s ? `<div class="stat-sub">${fmtTime(d.best_day_total_s)} jogados</div>` : ''}
+        </div>
+        <div class="detail-extra-stat">
+          <div class="stat-label">Primeira vez</div>
+          <div class="stat-value">${fmtDate(d.first_played)}</div>
+        </div>
+        <div class="detail-extra-stat">
+          <div class="stat-label">Dias jogados</div>
+          <div class="stat-value">${countUniqueDays(d.sessions)}</div>
+        </div>
+      </div>
+    </div>
+
+    <div>
       <div class="section-header">Sessões</div>
       <div class="sessions-list" style="margin-top:12px">${sessions}</div>
     </div>
@@ -102,6 +130,18 @@ function buildHTML(d) {
       </div>
     </div>
   </div>`;
+}
+
+function fmtDayDate(dateStr) {
+  if (!dateStr) return '—';
+  const [y, m, d] = dateStr.split('-');
+  return `${d}/${m}/${y}`;
+}
+
+function countUniqueDays(sessions) {
+  if (!sessions?.length) return '—';
+  const days = new Set(sessions.map(s => s.started_at?.slice(0, 10)));
+  return days.size;
 }
 
 function buildNotFound() {
