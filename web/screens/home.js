@@ -20,6 +20,10 @@ export function mount(container, navigate, params = {}) {
       if (cancelled) return;
 
       const sorted = [...games].sort((a, b) => new Date(b.last_played) - new Date(a.last_played));
+      if (active) {
+        const activeIdx = sorted.findIndex(g => g.id === active.game_id);
+        if (activeIdx > 0) sorted.unshift(sorted.splice(activeIdx, 1)[0]);
+      }
       const items = [...sorted.slice(0, 10), { id: 'library', display_name: 'Library', _lib: true }];
       container.innerHTML = buildHTML(items, selectedIndex, active, stats, games);
       updateHero(items[selectedIndex], active, games);
@@ -229,7 +233,8 @@ function updateHero(item, active, games) {
 
   const isActive = active && item.id === active.game_id;
   if (isActive) {
-    const elapsed = Math.floor((Date.now() - new Date(active.started_at).getTime()) / 1000);
+    const startedAt = active.started_at.endsWith('Z') || active.started_at.includes('+') ? active.started_at : active.started_at + 'Z';
+    const elapsed = Math.floor((Date.now() - new Date(startedAt).getTime()) / 1000);
     badge.hidden = false;
     badge.textContent = `SESSÃO ATIVA · ${fmtTime(elapsed)}`;
   } else {
