@@ -20,7 +20,7 @@ export function mount(container, navigate, params = {}) {
       if (cancelled) return;
 
       const sorted = [...games].sort((a, b) => new Date(b.last_played) - new Date(a.last_played));
-      const items = [...sorted, { id: 'library', display_name: 'Library', _lib: true }];
+      const items = [...sorted.slice(0, 10), { id: 'library', display_name: 'Library', _lib: true }];
       container.innerHTML = buildHTML(items, selectedIndex, active, stats, games);
       updateHero(items[selectedIndex], active, games);
       scrollRow(selectedIndex);
@@ -45,6 +45,10 @@ export function mount(container, navigate, params = {}) {
               e.preventDefault();
               focus = 'stats';
               document.getElementById('section-stats')?.scrollIntoView({ behavior: 'smooth' });
+              break;
+            case 'Square':
+              e.preventDefault();
+              navigate('library');
               break;
             case 'Enter':
             case ' ':

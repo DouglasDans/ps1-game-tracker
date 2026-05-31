@@ -8,10 +8,14 @@ export function mount(container, navigate, params = {}) {
   container.innerHTML = '<div style="padding:40px;color:var(--text-muted);text-align:center">Carregando...</div>';
 
   function setupNav() {
+    const back = params.from ?? 'home';
+    const backParams = params.from === 'library'
+      ? { selectedIndex: params.libraryIndex, platformFilter: params.libraryFilter }
+      : {};
     function onKey(e) {
-      if (e.key === 'Escape' || e.key === 'Backspace') navigate('home');
+      if (e.key === 'Escape' || e.key === 'Backspace') navigate(back, backParams);
     }
-    container.querySelector('.detail-back')?.addEventListener('click', () => navigate('home'));
+    container.querySelector('.detail-back')?.addEventListener('click', () => navigate(back, backParams));
     onKeyHandler = onKey;
     document.addEventListener('keydown', onKey);
   }

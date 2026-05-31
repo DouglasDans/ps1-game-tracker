@@ -40,6 +40,9 @@ function initGamepad() {
       const map = [
         { btn: 0,  key: 'Enter' },
         { btn: 1,  key: 'Escape' },
+        { btn: 2,  key: 'Square' },
+        { btn: 4,  key: 'L1' },
+        { btn: 5,  key: 'R1' },
         { btn: 12, key: 'ArrowUp' },
         { btn: 13, key: 'ArrowDown' },
         { btn: 14, key: 'ArrowLeft' },
@@ -79,8 +82,7 @@ function updateControllerStatus(connected, id = '') {
   if (!dot || !text) return;
   dot.style.opacity = connected ? '1' : '0.3';
   if (connected) {
-    const name = id.split('(')[0].replace(/controller/i, '').trim();
-    text.textContent = name || 'Controle conectado';
+    text.textContent = id.trim() || 'Controle conectado';
   } else {
     text.textContent = 'Sem controle';
   }
@@ -106,13 +108,13 @@ function init() {
       <div class="bottom-hints">
         <span class="hint"><span class="hint-btn">✕</span> Selecionar</span>
         <span class="hint"><span class="hint-btn">○</span> Voltar</span>
-        <span class="hint"><span class="hint-btn">□</span> Filtrar</span>
-        <span class="hint"><span class="hint-btn">△</span> Opções</span>
+        <span class="hint"><span class="hint-btn">□</span> Library</span>
+        <span class="hint"><span class="hint-btn">↓</span> Stats</span>
       </div>
       <div class="bottom-status">
         <span class="status-item">
           <span class="status-dot network"></span>
-          Rede local
+          192.168.1.150
         </span>
         <span class="status-item">
           <span class="status-dot controller"></span>

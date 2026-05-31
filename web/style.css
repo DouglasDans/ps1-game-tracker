@@ -706,14 +706,13 @@ body {
 .screen-library {
   height: 100%;
   overflow-y: auto;
-  padding: 36px var(--side-pad) 40px;
 }
 
 .library-header {
   display: flex;
   align-items: center;
   gap: 20px;
-  margin-bottom: 28px;
+  padding: 36px var(--side-pad) 20px;
 }
 
 .library-title {
@@ -744,10 +743,17 @@ body {
   color: var(--text);
 }
 
+.filter-chip.focused {
+  border-color: var(--text-dim);
+  color: var(--text);
+  box-shadow: 0 0 0 1px var(--text-dim);
+}
+
 .library-grid {
   display: flex;
   flex-wrap: wrap;
   gap: 20px 14px;
+  padding: 24px var(--side-pad) 40px;
 }
 
 .lib-card {

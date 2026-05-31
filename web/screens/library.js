@@ -1,11 +1,23 @@
 import { fetchGames } from '../data/api.js';
 import { fmtTime, cardGradient, PLATFORM_LOGO } from '../utils.js';
 
-const COLS = Math.floor((1920 - 128) / (130 + 14));
+function computeCols(container) {
+  const cards = container.querySelectorAll('.lib-card');
+  if (cards.length === 0) return 1;
+  const firstTop = cards[0].offsetTop;
+  let cols = 0;
+  for (const card of cards) {
+    if (card.offsetTop === firstTop) cols++;
+    else break;
+  }
+  return cols || 1;
+}
 
 export function mount(container, navigate, params = {}) {
-  let selectedIndex = 0;
-  let platformFilter = 'all';
+  let selectedIndex = params.selectedIndex ?? 0;
+  let platformFilter = params.platformFilter ?? 'all';
+  let focus = 'grid';
+  let filterIndex = 0;
   let onKeyHandler = null;
   let cancelled = false;
 
@@ -15,6 +27,8 @@ export function mount(container, navigate, params = {}) {
     .then(allGames => {
       if (cancelled) return;
 
+      const platforms = ['all', ...new Set(allGames.map(g => g.platform).filter(Boolean))];
+
       function filtered() {
         if (platformFilter === 'all') return allGames;
         return allGames.filter(g => g.platform === platformFilter);
@@ -22,47 +36,117 @@ export function mount(container, navigate, params = {}) {
 
       function refreshGrid(games) {
         container.querySelector('.library-grid').innerHTML = gridHTML(games, selectedIndex);
-        container.querySelectorAll('.lib-card').forEach(card => {
-          card.addEventListener('click', () => navigate('detail', { gameId: Number(card.dataset.id) }));
+        const selectedCard = container.querySelector('.lib-card.selected');
+        if (selectedCard) {
+          const cols = computeCols(container);
+          if (selectedIndex < cols) {
+            container.querySelector('.screen-library').scrollTo({ top: 0, behavior: 'smooth' });
+          } else {
+            selectedCard.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+          }
+        }
+        container.querySelectorAll('.lib-card').forEach((card, i) => {
+          card.addEventListener('click', () => navigate('detail', { gameId: Number(card.dataset.id), from: 'library', libraryIndex: i, libraryFilter: platformFilter }));
         });
+      }
+
+      function refreshFilters() {
+        container.querySelectorAll('.filter-chip').forEach((c, i) => {
+          c.classList.toggle('active', platforms[i] === platformFilter);
+          c.classList.toggle('focused', focus === 'filters' && i === filterIndex);
+        });
+      }
+
+      function setFilter(platform) {
+        platformFilter = platform;
+        filterIndex = platforms.indexOf(platform);
+        selectedIndex = 0;
+        refreshFilters();
+        refreshGrid(filtered());
       }
 
       function attachChipListeners() {
         container.querySelectorAll('.filter-chip').forEach(chip => {
-          chip.addEventListener('click', () => {
-            platformFilter = chip.dataset.platform;
-            selectedIndex = 0;
-            refreshGrid(filtered());
-            container.querySelectorAll('.filter-chip').forEach(c =>
-              c.classList.toggle('active', c.dataset.platform === platformFilter)
-            );
-          });
+          chip.addEventListener('click', () => setFilter(chip.dataset.platform));
         });
-        container.querySelectorAll('.lib-card').forEach(card => {
-          card.addEventListener('click', () => navigate('detail', { gameId: Number(card.dataset.id) }));
+        container.querySelectorAll('.lib-card').forEach((card, i) => {
+          card.addEventListener('click', () => navigate('detail', { gameId: Number(card.dataset.id), from: 'library', libraryIndex: i, libraryFilter: platformFilter }));
         });
       }
 
       container.innerHTML = buildHTML(allGames, filtered(), selectedIndex, platformFilter);
       attachChipListeners();
 
+      if (selectedIndex > 0) {
+        requestAnimationFrame(() => {
+          container.querySelector('.lib-card.selected')?.scrollIntoView({ block: 'center' });
+        });
+      }
+
       function onKey(e) {
+        if (focus === 'filters') {
+          switch (e.key) {
+            case 'ArrowLeft':
+              filterIndex = Math.max(0, filterIndex - 1);
+              refreshFilters();
+              break;
+            case 'ArrowRight':
+              filterIndex = Math.min(platforms.length - 1, filterIndex + 1);
+              refreshFilters();
+              break;
+            case 'Enter':
+              setFilter(platforms[filterIndex]);
+              focus = 'grid';
+              refreshFilters();
+              break;
+            case 'ArrowDown':
+              focus = 'grid';
+              refreshFilters();
+              break;
+            case 'Escape':
+              navigate('home');
+              break;
+          }
+          return;
+        }
+
+        // focus === 'grid'
         const games = filtered();
         switch (e.key) {
+          case 'L1': {
+            const idx = platforms.indexOf(platformFilter);
+            setFilter(platforms[(idx - 1 + platforms.length) % platforms.length]);
+            break;
+          }
+          case 'R1': {
+            const idx = platforms.indexOf(platformFilter);
+            setFilter(platforms[(idx + 1) % platforms.length]);
+            break;
+          }
           case 'ArrowRight':
             if (selectedIndex < games.length - 1) { selectedIndex++; refreshGrid(games); }
             break;
           case 'ArrowLeft':
             if (selectedIndex > 0) { selectedIndex--; refreshGrid(games); }
             break;
-          case 'ArrowDown':
-            if (selectedIndex + COLS < games.length) { selectedIndex += COLS; refreshGrid(games); }
+          case 'ArrowDown': {
+            const cols = computeCols(container);
+            if (selectedIndex + cols < games.length) { selectedIndex += cols; refreshGrid(games); }
             break;
-          case 'ArrowUp':
-            if (selectedIndex - COLS >= 0) { selectedIndex -= COLS; refreshGrid(games); }
+          }
+          case 'ArrowUp': {
+            const cols = computeCols(container);
+            if (selectedIndex - cols >= 0) { selectedIndex -= cols; refreshGrid(games); }
+            else {
+              focus = 'filters';
+              filterIndex = platforms.indexOf(platformFilter);
+              refreshFilters();
+              container.querySelector('.screen-library')?.scrollTo({ top: 0, behavior: 'smooth' });
+            }
             break;
+          }
           case 'Enter':
-            navigate('detail', { gameId: games[selectedIndex].id });
+            navigate('detail', { gameId: games[selectedIndex].id, from: 'library', libraryIndex: selectedIndex, libraryFilter: platformFilter });
             break;
           case 'Escape':
             navigate('home');
@@ -85,7 +169,7 @@ export function mount(container, navigate, params = {}) {
 }
 
 function buildHTML(allGames, games, selectedIndex, platformFilter) {
-  const platforms = ['all', ...new Set(allGames.map(g => g.platform))];
+  const platforms = ['all', ...new Set(allGames.map(g => g.platform).filter(Boolean))];
   const chips = platforms.map(p => {
     const label = p === 'all' ? 'Todos' : p;
     return `<span class="filter-chip${p === platformFilter ? ' active' : ''}" data-platform="${p}">${label}</span>`;
