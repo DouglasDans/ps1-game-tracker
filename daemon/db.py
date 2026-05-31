@@ -289,12 +289,23 @@ def get_stats_summary(conn: sqlite3.Connection) -> dict:
 
     by_platform = conn.execute(
         """
-        SELECT COALESCE(g.platform, 'Outros') AS platform,
-               COALESCE(SUM(s.duration_s), 0) AS total_seconds
-        FROM sessions s
-        JOIN games g ON g.id = s.game_id
-        WHERE s.ended_at IS NOT NULL
-        GROUP BY COALESCE(g.platform, 'Outros')
+        WITH resolved AS (
+            SELECT s.duration_s,
+                   COALESCE(
+                       g.platform,
+                       (SELECT g2.platform FROM games g2
+                        WHERE g2.canonical_name = g.canonical_name
+                          AND g2.platform IS NOT NULL
+                        LIMIT 1),
+                       'Outros'
+                   ) AS platform
+            FROM sessions s
+            JOIN games g ON g.id = s.game_id
+            WHERE s.ended_at IS NOT NULL
+        )
+        SELECT platform, COALESCE(SUM(duration_s), 0) AS total_seconds
+        FROM resolved
+        GROUP BY platform
         ORDER BY total_seconds DESC
         """,
     ).fetchall()

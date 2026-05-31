@@ -19,7 +19,8 @@ export function mount(container, navigate, params = {}) {
     .then(([games, active, stats]) => {
       if (cancelled) return;
 
-      const items = [...games, { id: 'library', display_name: 'Library', _lib: true }];
+      const sorted = [...games].sort((a, b) => new Date(b.last_played) - new Date(a.last_played));
+      const items = [...sorted, { id: 'library', display_name: 'Library', _lib: true }];
       container.innerHTML = buildHTML(items, selectedIndex, active, stats, games);
       updateHero(items[selectedIndex], active, games);
       scrollRow(selectedIndex);
