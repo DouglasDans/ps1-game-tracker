@@ -1,8 +1,10 @@
 import { fetchGames, fetchActiveSession, fetchStats } from '../data/api.js';
 import { fmtTime, fmtDate, fmtDateShort, fmtSource, cardGradient, platformLogoImg } from '../utils.js';
 
-const CARD_W   = 130;
-const CARD_GAP = 14;
+const CARD_W         = 130;
+const CARD_GAP       = 14;
+const SCROLL_STEP    = 240;
+const POLL_ACTIVE_MS = 10000;
 
 let _savedIndex = 0;
 
@@ -11,6 +13,7 @@ export function mount(container, navigate, params = {}) {
   let focus = 'row';
   let onKeyHandler = null;
   let timerInterval = null;
+  let pollInterval = null;
   let cancelled = false;
 
   container.innerHTML = '<div style="padding:40px;color:var(--text-muted);text-align:center">Carregando...</div>';
@@ -65,8 +68,17 @@ export function mount(container, navigate, params = {}) {
         } else {
           if (e.key === 'ArrowUp') {
             e.preventDefault();
-            focus = 'row';
-            document.getElementById('section-home')?.scrollIntoView({ behavior: 'smooth' });
+            const scroller = container.querySelector('.screen-home');
+            const stats = document.getElementById('section-stats');
+            if (scroller && stats && scroller.scrollTop > stats.offsetTop + 10) {
+              scroller.scrollBy({ top: -SCROLL_STEP, behavior: 'smooth' });
+            } else {
+              focus = 'row';
+              document.getElementById('section-home')?.scrollIntoView({ behavior: 'smooth' });
+            }
+          } else if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            container.querySelector('.screen-home')?.scrollBy({ top: SCROLL_STEP, behavior: 'smooth' });
           }
         }
       }
@@ -74,11 +86,24 @@ export function mount(container, navigate, params = {}) {
       onKeyHandler = onKey;
       document.addEventListener('keydown', onKey);
 
-      if (active) {
-        timerInterval = setInterval(() => {
-          if (items[selectedIndex].id === active.game_id) updateHero(items[selectedIndex], active, games);
-        }, 1000);
-      }
+      timerInterval = setInterval(() => {
+        if (active && items[selectedIndex].id === active.game_id) updateHero(items[selectedIndex], active, games);
+      }, 1000);
+
+      pollInterval = setInterval(() => {
+        fetchActiveSession()
+          .then(a => {
+            if (cancelled) return;
+            const changed = a?.id !== active?.id || a?.game_id !== active?.game_id;
+            if (!changed) return;
+            active = a;
+            document.querySelectorAll('.game-card[data-id]').forEach(el => {
+              el.classList.toggle('has-active', !!active && Number(el.dataset.id) === active.game_id);
+            });
+            updateHero(items[selectedIndex], active, games);
+          })
+          .catch(() => {});
+      }, POLL_ACTIVE_MS);
     })
     .catch(err => {
       if (cancelled) return;
@@ -89,6 +114,7 @@ export function mount(container, navigate, params = {}) {
     cancelled = true;
     if (onKeyHandler) document.removeEventListener('keydown', onKeyHandler);
     if (timerInterval) clearInterval(timerInterval);
+    if (pollInterval) clearInterval(pollInterval);
   };
 }
 
@@ -155,7 +181,7 @@ function buildHTML(items, selectedIndex, active, stats, games) {
 
 function buildStatsHTML(stats, games) {
   const s = stats;
-  const topGames = [...games].sort((a, b) => b.total_seconds - a.total_seconds).slice(0, 5);
+  const topGames = [...games].sort((a, b) => b.total_seconds - a.total_seconds).slice(0, 8);
 
   const bars = s.by_platform.map(p => `
     <div class="platform-bar-row">
@@ -167,15 +193,16 @@ function buildStatsHTML(stats, games) {
     </div>`).join('');
 
   const topList = topGames.map((g, i) => {
+    const cover = g.cover_url ? `<img src="${g.cover_url}" alt="" class="cover-img">` : '';
+    const pct = s.total_seconds ? Math.round((g.total_seconds / s.total_seconds) * 100) : 0;
     return `<div class="top-game-row">
       <span class="top-game-rank">${i + 1}</span>
-      <div class="top-game-cover" style="background:${cardGradient(g.display_name)}">
-      </div>
+      <div class="top-game-cover" style="background:${cardGradient(g.display_name)}">${cover}</div>
       <div class="top-game-info">
         <div class="top-game-name">${g.display_name}</div>
-        <div class="top-game-meta">${g.platform} · ${g.session_count} sessões</div>
+        <div class="top-game-meta">${g.platform ?? ''} · ${g.session_count} sessões</div>
       </div>
-      <div class="top-game-time">${fmtTime(g.total_seconds)}</div>
+      <div class="top-game-time">${fmtTime(g.total_seconds)}<div class="top-game-pct">${pct}%</div></div>
     </div>`;
   }).join('');
 

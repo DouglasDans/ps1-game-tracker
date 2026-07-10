@@ -31,6 +31,12 @@ pip install -r requirements.txt -r requirements-dev.txt
 # Servidor de desenvolvimento
 uvicorn daemon.main:app --reload --port 8080
 
+# Frontend local contra dados de produção (workflow preferido para mexer no web/)
+# O web/data/api.js aponta hardcoded para http://192.168.1.150:9876 (Pi de produção)
+# e o daemon tem CORS liberado — basta servir a pasta web/ estaticamente:
+python3 -m http.server 8000 -d web
+# Abrir http://localhost:8000 — alterações no front aparecem no reload, dados reais do Pi
+
 # Testes (obrigatório antes de qualquer commit)
 pytest
 

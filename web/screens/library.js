@@ -189,7 +189,7 @@ function gridHTML(games, selectedIndex) {
     const cover = g.cover_url
       ? `<img src="${g.cover_url}" alt="" class="cover-img">`
       : `<div class="cover-gradient" style="background:${cardGradient(g.display_name)};width:100%;height:100%;display:flex;align-items:flex-end;padding:10px">
-           <span class="card-name-fb" style="font-size:0.65rem">${g.display_name.toUpperCase()}</span>
+           <span class="card-name-fb" style="font-size:0.72rem">${g.display_name.toUpperCase()}</span>
          </div>`;
     return `<div class="lib-card${i === selectedIndex ? ' selected' : ''}" data-id="${g.id}">
       <div class="lib-card-cover">

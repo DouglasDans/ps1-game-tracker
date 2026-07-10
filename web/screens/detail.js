@@ -1,6 +1,8 @@
 import { fetchGameDetail } from '../data/api.js';
 import { fmtTime, fmtDate, fmtDateShort, fmtSource, cardGradient, platformLogoImg, getPlatformLogo } from '../utils.js';
 
+const SCROLL_STEP = 240;
+
 export function mount(container, navigate, params = {}) {
   let onKeyHandler = null;
   let cancelled = false;
@@ -13,7 +15,11 @@ export function mount(container, navigate, params = {}) {
       ? { selectedIndex: params.libraryIndex, platformFilter: params.libraryFilter }
       : {};
     function onKey(e) {
-      if (e.key === 'Escape' || e.key === 'Backspace') navigate(back, backParams);
+      if (e.key === 'Escape' || e.key === 'Backspace') { navigate(back, backParams); return; }
+      const scroller = container.querySelector('.screen-detail');
+      if (!scroller) return;
+      if (e.key === 'ArrowDown') { e.preventDefault(); scroller.scrollBy({ top: SCROLL_STEP, behavior: 'smooth' }); }
+      if (e.key === 'ArrowUp')   { e.preventDefault(); scroller.scrollBy({ top: -SCROLL_STEP, behavior: 'smooth' }); }
     }
     container.querySelector('.detail-back')?.addEventListener('click', () => navigate(back, backParams));
     onKeyHandler = onKey;

@@ -1,6 +1,7 @@
 import { mount as mountHome }    from './screens/home.js';
 import { mount as mountDetail }  from './screens/detail.js';
 import { mount as mountLibrary } from './screens/library.js';
+import { API_HOST }              from './data/api.js';
 
 const SCREENS = { home: mountHome, detail: mountDetail, library: mountLibrary };
 
@@ -11,12 +12,32 @@ export function navigate(screen, params = {}) {
   const main = document.getElementById('main');
   currentCleanup = SCREENS[screen](main, navigate, params) ?? null;
   updateNav(screen);
+  updateHints(screen);
 }
 
 function updateNav(screen) {
   document.querySelectorAll('.nav-item').forEach(el => {
     el.classList.toggle('active', el.dataset.screen === screen);
   });
+}
+
+const SCREEN_HINTS = {
+  home: `
+    <span class="hint"><span class="hint-btn">✕</span> Selecionar</span>
+    <span class="hint"><span class="hint-btn">□</span> Library</span>
+    <span class="hint"><span class="hint-btn">↓</span> Stats</span>`,
+  library: `
+    <span class="hint"><span class="hint-btn">✕</span> Selecionar</span>
+    <span class="hint"><span class="hint-btn">○</span> Voltar</span>
+    <span class="hint"><span class="hint-btn hint-btn-wide">L1</span><span class="hint-btn hint-btn-wide">R1</span> Filtro</span>`,
+  detail: `
+    <span class="hint"><span class="hint-btn">○</span> Voltar</span>
+    <span class="hint"><span class="hint-btn">↑</span><span class="hint-btn">↓</span> Rolar</span>`,
+};
+
+function updateHints(screen) {
+  const el = document.getElementById('bottom-hints');
+  if (el) el.innerHTML = SCREEN_HINTS[screen] ?? SCREEN_HINTS.home;
 }
 
 function updateClock() {
@@ -105,16 +126,11 @@ function init() {
     <main id="main"></main>
 
     <footer class="bottom-bar">
-      <div class="bottom-hints">
-        <span class="hint"><span class="hint-btn">✕</span> Selecionar</span>
-        <span class="hint"><span class="hint-btn">○</span> Voltar</span>
-        <span class="hint"><span class="hint-btn">□</span> Library</span>
-        <span class="hint"><span class="hint-btn">↓</span> Stats</span>
-      </div>
+      <div class="bottom-hints" id="bottom-hints"></div>
       <div class="bottom-status">
         <span class="status-item">
           <span class="status-dot network"></span>
-          192.168.1.150
+          ${API_HOST}
         </span>
         <span class="status-item">
           <span class="status-dot controller"></span>

@@ -13,8 +13,8 @@
   --accent: #0070d1;
   --accent-glow: rgba(0, 112, 209, 0.3);
   --text: #f0f0f8;
-  --text-dim: #ababc8;
-  --text-muted: #646488;
+  --text-dim: #b8b8d4;
+  --text-muted: #9090b8;
   --radius: 8px;
   --card-w: 130px;
   --card-h: 188px;
@@ -78,7 +78,7 @@ body {
 
 .nav-item {
   padding: 6px 18px;
-  font-size: 0.72rem;
+  font-size: 0.8rem;
   font-weight: 600;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -131,24 +131,30 @@ body {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 0.72rem;
+  font-size: 0.8rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--text-muted);
 }
 
 .hint-btn {
-  width: 18px;
-  height: 18px;
+  width: 22px;
+  height: 22px;
   border-radius: 50%;
   border: 1.5px solid var(--text-muted);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.68rem;
+  font-size: 0.75rem;
   font-weight: 700;
   flex-shrink: 0;
   color: var(--text-muted);
+}
+
+.hint-btn-wide {
+  width: auto;
+  padding: 0 7px;
+  border-radius: 11px;
 }
 
 .bottom-status {
@@ -161,7 +167,7 @@ body {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 0.72rem;
+  font-size: 0.8rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--text-muted);
@@ -208,7 +214,7 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 0.68rem;
+  font-size: 0.75rem;
   font-weight: 600;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -261,7 +267,7 @@ body {
 
 .top-game-rank {
   width: 20px;
-  font-size: 0.75rem;
+  font-size: 0.85rem;
   font-weight: 700;
   color: var(--text-muted);
   text-align: center;
@@ -295,7 +301,7 @@ body {
 }
 
 .top-game-name {
-  font-size: 0.82rem;
+  font-size: 0.92rem;
   font-weight: 600;
   color: var(--text);
   white-space: nowrap;
@@ -304,17 +310,25 @@ body {
 }
 
 .top-game-meta {
-  font-size: 0.7rem;
+  font-size: 0.78rem;
   color: var(--text-muted);
   margin-top: 2px;
 }
 
 .top-game-time {
-  font-size: 0.82rem;
+  font-size: 0.92rem;
   font-weight: 600;
   color: var(--text-dim);
   font-variant-numeric: tabular-nums;
   flex-shrink: 0;
+  text-align: right;
+}
+
+.top-game-pct {
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  margin-top: 2px;
 }
 
 .hero {
@@ -335,7 +349,7 @@ body {
 }
 
 .badge {
-  font-size: 0.65rem;
+  font-size: 0.72rem;
   font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -363,7 +377,7 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 0.72rem;
+  font-size: 0.8rem;
   font-weight: 600;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -407,7 +421,7 @@ body {
 }
 
 .stat-label {
-  font-size: 0.68rem;
+  font-size: 0.75rem;
   font-weight: 600;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -416,7 +430,7 @@ body {
 }
 
 .stat-value {
-  font-size: 0.88rem;
+  font-size: 1rem;
   font-weight: 500;
   color: var(--text-dim);
 }
@@ -459,7 +473,7 @@ body {
   width: var(--card-w-sel);
   height: var(--card-h-sel);
   box-shadow:
-    0 0 0 2.5px var(--accent),
+    0 0 0 3px var(--accent),
     0 8px 32px var(--accent-glow);
 }
 
@@ -482,7 +496,7 @@ body {
 .card-name-fb {
   position: relative;
   z-index: 1;
-  font-size: 0.7rem;
+  font-size: 0.78rem;
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -540,7 +554,7 @@ body {
 }
 
 .card-library-inner {
-  font-size: 0.68rem;
+  font-size: 0.75rem;
   font-weight: 700;
   letter-spacing: 0.15em;
   text-transform: uppercase;
@@ -565,7 +579,7 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 0.7rem;
+  font-size: 0.78rem;
   font-weight: 600;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -624,7 +638,7 @@ body {
   object-fit: contain;
 }
 .detail-meta-text {
-  font-size: 0.8rem;
+  font-size: 0.9rem;
   color: var(--text-muted);
   letter-spacing: 0.04em;
 }
@@ -658,7 +672,7 @@ body {
 }
 
 .detail-extra-stat .stat-label {
-  font-size: 0.68rem;
+  font-size: 0.75rem;
   font-weight: 600;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -666,13 +680,13 @@ body {
 }
 
 .detail-extra-stat .stat-value {
-  font-size: 1rem;
+  font-size: 1.15rem;
   font-weight: 800;
   color: var(--text);
 }
 
 .stat-sub {
-  font-size: 0.7rem;
+  font-size: 0.78rem;
   color: var(--text-muted);
   margin-top: 1px;
 }
@@ -681,7 +695,7 @@ body {
   display: flex;
   align-items: center;
   gap: 12px;
-  font-size: 0.68rem;
+  font-size: 0.75rem;
   font-weight: 700;
   letter-spacing: 0.15em;
   text-transform: uppercase;
@@ -715,19 +729,19 @@ body {
 }
 
 .session-date {
-  width: 90px;
-  font-size: 0.82rem;
+  width: 110px;
+  font-size: 0.92rem;
   color: var(--text-dim);
   font-variant-numeric: tabular-nums;
 }
 .session-dur {
-  width: 80px;
-  font-size: 0.82rem;
+  width: 95px;
+  font-size: 0.92rem;
   font-weight: 600;
   color: var(--text);
 }
 .session-src {
-  font-size: 0.78rem;
+  font-size: 0.85rem;
   color: var(--text-muted);
 }
 
@@ -736,7 +750,7 @@ body {
   background: rgba(255, 255, 255, 0.02);
   border-radius: var(--radius);
   border: 1px dashed rgba(255, 255, 255, 0.06);
-  font-size: 0.78rem;
+  font-size: 0.85rem;
   color: var(--text-muted);
   text-align: center;
 }
@@ -764,7 +778,7 @@ body {
 .filter-chip {
   padding: 6px 14px;
   border-radius: 20px;
-  font-size: 0.68rem;
+  font-size: 0.75rem;
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -806,17 +820,24 @@ body {
   overflow: hidden;
   position: relative;
   margin-bottom: 8px;
-  transition: box-shadow 0.2s;
+  transition:
+    box-shadow 0.2s,
+    transform 0.2s;
 }
 
 .lib-card.selected .lib-card-cover {
+  transform: scale(1.07);
   box-shadow:
-    0 0 0 2.5px var(--accent),
-    0 4px 16px var(--accent-glow);
+    0 0 0 3px var(--accent),
+    0 6px 24px var(--accent-glow);
+}
+
+.lib-card.selected .lib-card-name {
+  color: var(--text);
 }
 
 .lib-card-name {
-  font-size: 0.72rem;
+  font-size: 0.8rem;
   color: var(--text-dim);
   white-space: nowrap;
   overflow: hidden;
@@ -825,7 +846,7 @@ body {
 }
 
 .lib-card-time {
-  font-size: 0.67rem;
+  font-size: 0.75rem;
   color: var(--text-muted);
   margin-top: 2px;
 }
@@ -863,7 +884,7 @@ body {
 }
 
 .stats-card-label {
-  font-size: 0.68rem;
+  font-size: 0.75rem;
   font-weight: 600;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -877,7 +898,7 @@ body {
   color: var(--text);
 }
 .stats-card-sub {
-  font-size: 0.78rem;
+  font-size: 0.85rem;
   color: var(--text-muted);
 }
 
@@ -906,7 +927,7 @@ body {
   object-fit: contain;
 }
 .platform-bar-logo .platform-text {
-  font-size: 0.7rem;
+  font-size: 0.78rem;
   color: var(--text-muted);
 }
 
@@ -926,9 +947,9 @@ body {
 }
 
 .platform-bar-value {
-  width: 52px;
+  width: 64px;
   text-align: right;
-  font-size: 0.72rem;
+  font-size: 0.8rem;
   color: var(--text-muted);
   font-variant-numeric: tabular-nums;
 }
