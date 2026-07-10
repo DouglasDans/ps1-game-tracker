@@ -81,6 +81,7 @@ ps1-game-tracker/
 │   │   ├── samba.py         # PS2 via OPL / smbstatus [FASE 2]
 │   │   └── lrtl.py          # RetroArch .lrtl import [FASE 2]
 │   ├── enricher.py          # ScreenScraper → IGDB → regex [FASE 3]
+│   ├── activity.py          # padrão dia/hora + streak (timezone-aware) [FASE 4]
 │   ├── session_manager.py   # open/close/heartbeat de sessão [FASE 1]
 │   ├── db.py                # schema SQLite + funções de acesso [FASE 1]
 │   └── main.py              # FastAPI app + threads [FASE 1]
@@ -140,6 +141,11 @@ ps1-game-tracker/
 │ cover_url             TEXT                              │
 │ genre                 TEXT                              │
 │ release_year          INTEGER                           │
+│ summary               TEXT  ← sinopse (IGDB)             │
+│ developer             TEXT  ← involved_companies onde     │
+│                                   developer=true, joined  │
+│ game_modes            TEXT  ← ex: "Single player,        │
+│                                   Multiplayer"            │
 │ enriched_at           DATETIME                          │
 │ notion_page_id        TEXT                              │
 │ igdb_id               INTEGER  ← mesmo id p/ CTTR PS2   │
@@ -301,5 +307,9 @@ Confirmado em produção com DuckStation AppImage + PPSSPP:
 **Fase 2 concluída (2026-05-23):** `samba_watcher` parseia `smbstatus -L` para detectar ISOs PS2/OPL abertas via SMB (requer entrada no sudoers). `lrtl_importer` lê `.lrtl` do RetroArch e importa sessões por delta em relação ao acumulado já no DB — disparado no startup e quando o processo RetroArch encerra. Novos campos opcionais no config: `samba_rom_dirs`, `retroarch_playlist_dirs`, `samba_debounce_polls` (default 3 — OPL solta o lock brevemente durante boot). `strip_ps2_serial` em `session_manager.py` remove o prefixo serial OPL (`SLUS_NNN.NN.`) do display_name/canonical_name. `lrtl_importer` aplica `normalize_game_name` no stem do `.lrtl` para que histórico RetroArch e procfs agregem corretamente na `playtime_summary`.
 
 **Fase 4 concluída (2026-05-31, polish TV em 2026-07-09):** frontend em vanilla JS com módulos ES (`app.js` roteia `screens/home|detail|library`). Gamepad API mapeia botões para KeyboardEvents sintéticos (✕=Enter, ○=Escape, □=Square, L1/R1, d-pad). Passe de usabilidade TV (2026-07-09): scroll por setas no detail e na seção de stats, contraste `--text-muted` corrigido para ~6.2:1, escala tipográfica 10-foot, hints de rodapé contextuais por tela, polling de `/sessions/active` a cada 10s, "Mais jogados" com capas reais + % do tempo total, API/host derivados da origem da página (IP do Pi pode mudar sem quebrar).
+
+**Estatísticas ampliadas (2026-07-10):** `daemon/activity.py` — `GET /stats/activity` calcula padrão por dia da semana/hora e streak (atual + recorde) a partir de todas as sessões fechadas, convertendo UTC→`America/Sao_Paulo` antes de agrupar (senão sessão de fim de noite vaza pro dia seguinte). Streak "atual" considera ontem como válido se hoje ainda não teve sessão (não zera por não ter jogado ainda hoje). `genre`/`release_year` passam a ser expostos em `/games` (antes só no detail). Frontend: Library ganha ordenação (mais jogado / recente / A-Z) via chip — decisão explícita de não ter busca por texto, já que o sistema é 100% controle, sem teclado. Stats ganham cards/barras de streak, gênero, década e dia da semana.
+
+**Metadados IGDB ampliados (2026-07-10):** `enricher.py` passa a pedir `summary`, `involved_companies.company.name`/`.developer` e `game_modes.name` do IGDB (antes só `name,genres.name,cover.image_id,first_release_date`). `involved_companies` é filtrado por `developer == True` antes de juntar os nomes — evita creditar a publisher como desenvolvedora. Campos novos (`summary`, `developer`, `game_modes`) expostos em `/games` e `/games/{id}`; detail page ganha seção "Sinopse" e developer/game_modes na linha de meta; Stats ganha barras "por desenvolvedora" e "por modo de jogo". **Jogos já enriquecidos no Pi não recebem os campos novos automaticamente** — rodar `POST /admin/reset-enrichment` uma vez após o deploy pra reprocessar a biblioteca.
 
 **Fase 3 concluída (2026-05-30):** `daemon/enricher.py` — IGDB como único enricher (ScreenScraper descartado). `enrich_game` busca por `canonical_name` + filtro de platform (PS1=7, PS2=8, PSP=38); plataformas não mapeadas buscam sem filtro. Thread de background com fila (`enricher_loop`): seeded no startup com todos os jogos `enriched_at IS NULL`, e enfileira novos jogos detectados pelo polling loop. Throttle de 0.3s entre requests para respeitar 4 req/s do IGDB. `RateLimitError` (429): não incrementa `enrichment_retries` — game re-enfileirado após sleep de 10s. Desiste após 3 boots com falha (`enrichment_retries >= 3`). Token Twitch cacheado em `igdb_token.json` ao lado do DB (~62 dias). Schema: campo `enrichment_retries INTEGER DEFAULT 0` adicionado via `ALTER TABLE`. Configurar no Pi: adicionar `[igdb]` com `client_id` e `client_secret` ao `config.toml`.
