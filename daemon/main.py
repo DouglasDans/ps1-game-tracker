@@ -219,8 +219,15 @@ async def lifespan(app: FastAPI):
     logger.info("Daemon stopped")
 
 
+async def add_no_store_header(request, call_next):
+    response = await call_next(request)
+    response.headers["Cache-Control"] = "no-store"
+    return response
+
+
 app = FastAPI(title="PS1 Game Tracker", lifespan=lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["GET", "POST"])
+app.middleware("http")(add_no_store_header)
 
 
 @app.get("/sessions/active")
