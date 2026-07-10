@@ -1,6 +1,12 @@
 import { fetchGames } from '../data/api.js';
 import { fmtTime, cardGradient, getPlatformLogo } from '../utils.js';
 
+const SORT_MODES = [
+  { key: 'top',    label: 'Mais jogado', cmp: (a, b) => (b.total_seconds ?? 0) - (a.total_seconds ?? 0) },
+  { key: 'recent', label: 'Recente',     cmp: (a, b) => new Date(b.last_played ?? 0) - new Date(a.last_played ?? 0) },
+  { key: 'az',     label: 'A-Z',         cmp: (a, b) => a.display_name.localeCompare(b.display_name) },
+];
+
 function computeCols(container) {
   const cards = container.querySelectorAll('.lib-card');
   if (cards.length === 0) return 1;
@@ -16,6 +22,7 @@ function computeCols(container) {
 export function mount(container, navigate, params = {}) {
   let selectedIndex = params.selectedIndex ?? 0;
   let platformFilter = params.platformFilter ?? 'all';
+  let sortIndex = 0;
   let focus = 'grid';
   let filterIndex = 0;
   let onKeyHandler = null;
@@ -30,8 +37,8 @@ export function mount(container, navigate, params = {}) {
       const platforms = ['all', ...new Set(allGames.map(g => g.platform).filter(Boolean))];
 
       function filtered() {
-        if (platformFilter === 'all') return allGames;
-        return allGames.filter(g => g.platform === platformFilter);
+        const base = platformFilter === 'all' ? allGames : allGames.filter(g => g.platform === platformFilter);
+        return [...base].sort(SORT_MODES[sortIndex].cmp);
       }
 
       function refreshGrid(games) {
@@ -55,6 +62,11 @@ export function mount(container, navigate, params = {}) {
           c.classList.toggle('active', platforms[i] === platformFilter);
           c.classList.toggle('focused', focus === 'filters' && i === filterIndex);
         });
+        const sortChip = container.querySelector('.sort-chip');
+        if (sortChip) {
+          sortChip.textContent = `ORDENAR: ${SORT_MODES[sortIndex].label.toUpperCase()}`;
+          sortChip.classList.toggle('focused', focus === 'filters' && filterIndex === platforms.length);
+        }
       }
 
       function setFilter(platform) {
@@ -65,16 +77,24 @@ export function mount(container, navigate, params = {}) {
         refreshGrid(filtered());
       }
 
+      function cycleSort() {
+        sortIndex = (sortIndex + 1) % SORT_MODES.length;
+        selectedIndex = 0;
+        refreshFilters();
+        refreshGrid(filtered());
+      }
+
       function attachChipListeners() {
-        container.querySelectorAll('.filter-chip').forEach(chip => {
+        container.querySelectorAll('.filter-chip[data-platform]').forEach(chip => {
           chip.addEventListener('click', () => setFilter(chip.dataset.platform));
         });
+        container.querySelector('.sort-chip')?.addEventListener('click', cycleSort);
         container.querySelectorAll('.lib-card').forEach((card, i) => {
           card.addEventListener('click', () => navigate('detail', { gameId: Number(card.dataset.id), from: 'library', libraryIndex: i, libraryFilter: platformFilter }));
         });
       }
 
-      container.innerHTML = buildHTML(allGames, filtered(), selectedIndex, platformFilter);
+      container.innerHTML = buildHTML(allGames, filtered(), selectedIndex, platformFilter, sortIndex);
       attachChipListeners();
 
       if (selectedIndex > 0) {
@@ -91,11 +111,12 @@ export function mount(container, navigate, params = {}) {
               refreshFilters();
               break;
             case 'ArrowRight':
-              filterIndex = Math.min(platforms.length - 1, filterIndex + 1);
+              filterIndex = Math.min(platforms.length, filterIndex + 1);
               refreshFilters();
               break;
             case 'Enter':
-              setFilter(platforms[filterIndex]);
+              if (filterIndex === platforms.length) cycleSort();
+              else setFilter(platforms[filterIndex]);
               focus = 'grid';
               refreshFilters();
               break;
@@ -168,7 +189,7 @@ export function mount(container, navigate, params = {}) {
   };
 }
 
-function buildHTML(allGames, games, selectedIndex, platformFilter) {
+function buildHTML(allGames, games, selectedIndex, platformFilter, sortIndex) {
   const platforms = ['all', ...new Set(allGames.map(g => g.platform).filter(Boolean))];
   const chips = platforms.map(p => {
     const label = p === 'all' ? 'Todos' : p;
@@ -179,6 +200,7 @@ function buildHTML(allGames, games, selectedIndex, platformFilter) {
     <div class="library-header">
       <span class="library-title">Biblioteca</span>
       ${chips}
+      <span class="filter-chip sort-chip">ORDENAR: ${SORT_MODES[sortIndex].label.toUpperCase()}</span>
     </div>
     <div class="library-grid">${gridHTML(games, selectedIndex)}</div>
   </div>`;

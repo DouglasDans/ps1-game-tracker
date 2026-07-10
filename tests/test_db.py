@@ -5,6 +5,7 @@ from daemon.db import (
     heartbeat,
     crash_recovery,
     get_active_session,
+    get_activity_stats,
     get_game_detail,
     get_games,
     get_recent_sessions,
@@ -152,6 +153,36 @@ def test_get_games_returns_game_after_session_closes(conn):
     assert games[0]["session_count"] == 1
 
 
+def test_get_games_includes_genre_and_release_year(conn):
+    game_id = upsert_game(conn, "/roms/mgs.cue", "MGS", "PS1", "MGS")
+    conn.execute(
+        "UPDATE games SET genre = ?, release_year = ? WHERE id = ?",
+        ("Stealth", 1998, game_id),
+    )
+    session_id = open_session(conn, game_id, "duckstation")
+    close_session(conn, session_id)
+    conn.commit()
+
+    games = get_games(conn)
+    assert games[0]["genre"] == "Stealth"
+    assert games[0]["release_year"] == 1998
+
+
+def test_get_games_includes_developer_and_game_modes(conn):
+    game_id = upsert_game(conn, "/roms/mgs.cue", "MGS", "PS1", "MGS")
+    conn.execute(
+        "UPDATE games SET developer = ?, game_modes = ? WHERE id = ?",
+        ("Konami", "Single player", game_id),
+    )
+    session_id = open_session(conn, game_id, "duckstation")
+    close_session(conn, session_id)
+    conn.commit()
+
+    games = get_games(conn)
+    assert games[0]["developer"] == "Konami"
+    assert games[0]["game_modes"] == "Single player"
+
+
 def test_get_games_aggregates_multi_track_playtime(conn):
     id1 = upsert_game(conn, "/roms/Dino Crisis (Track 1).bin", "Dino Crisis", "PS1", "Dino Crisis")
     id2 = upsert_game(conn, "/roms/Dino Crisis (Track 2).bin", "Dino Crisis", "PS1", "Dino Crisis")
@@ -212,6 +243,34 @@ def test_update_game_enrichment_does_not_overwrite_existing_values_with_none(con
     assert row["display_name"] == "Old Name"
 
 
+def test_update_game_enrichment_sets_summary_developer_game_modes(conn):
+    game_id = upsert_game(conn, "/roms/mgs.chd")
+    update_game_enrichment(
+        conn, game_id,
+        summary="A stealth game about Solid Snake.",
+        developer="Konami",
+        game_modes="Single player, Multiplayer",
+    )
+    row = conn.execute(
+        "SELECT summary, developer, game_modes FROM games WHERE id = ?", (game_id,)
+    ).fetchone()
+    assert row["summary"] == "A stealth game about Solid Snake."
+    assert row["developer"] == "Konami"
+    assert row["game_modes"] == "Single player, Multiplayer"
+
+
+def test_update_game_enrichment_does_not_overwrite_summary_developer_game_modes_with_none(conn):
+    game_id = upsert_game(conn, "/roms/mgs.chd")
+    update_game_enrichment(conn, game_id, summary="Old summary", developer="Old Dev", game_modes="Single player")
+    update_game_enrichment(conn, game_id, summary=None, developer=None, game_modes=None)
+    row = conn.execute(
+        "SELECT summary, developer, game_modes FROM games WHERE id = ?", (game_id,)
+    ).fetchone()
+    assert row["summary"] == "Old summary"
+    assert row["developer"] == "Old Dev"
+    assert row["game_modes"] == "Single player"
+
+
 def test_increment_enrichment_retries(conn):
     game_id = upsert_game(conn, "/roms/mgs.chd")
     increment_enrichment_retries(conn, game_id)
@@ -247,6 +306,21 @@ def test_get_game_detail_returns_game_data(conn):
     assert len(result["sessions"]) == 1
     assert result["sessions"][0]["source"] == "duckstation"
     assert result["sessions"][0]["duration_s"] == 3600
+
+
+def test_get_game_detail_includes_summary_developer_game_modes(conn):
+    game_id = upsert_game(conn, "/roms/mgs.chd", "Metal Gear Solid", "PS1", "Metal Gear Solid")
+    update_game_enrichment(
+        conn, game_id,
+        summary="A stealth game about Solid Snake.",
+        developer="Konami",
+        game_modes="Single player",
+    )
+
+    result = get_game_detail(conn, game_id)
+    assert result["summary"] == "A stealth game about Solid Snake."
+    assert result["developer"] == "Konami"
+    assert result["game_modes"] == "Single player"
 
 
 def test_get_game_detail_excludes_open_sessions(conn):
@@ -479,6 +553,39 @@ def test_get_stats_summary_by_platform(conn):
     assert platforms["PS1"]["pct"] == 60
     assert platforms["PS2"]["total_seconds"] == 4000
     assert platforms["PS2"]["pct"] == 40
+
+
+# --- get_activity_stats ---
+
+def test_get_activity_stats_empty_db(conn):
+    result = get_activity_stats(conn)
+    assert result["current_streak"] == 0
+    assert result["longest_streak"] == 0
+    assert len(result["by_weekday"]) == 7
+    assert len(result["by_hour"]) == 24
+
+
+def test_get_activity_stats_excludes_open_sessions(conn):
+    game_id = upsert_game(conn, "/roms/mgs.chd", "MGS", "PS1", "MGS")
+    open_session(conn, game_id, "duckstation")
+
+    result = get_activity_stats(conn)
+    assert sum(h["total_seconds"] for h in result["by_hour"]) == 0
+
+
+def test_get_activity_stats_aggregates_closed_sessions(conn):
+    game_id = upsert_game(conn, "/roms/mgs.chd", "MGS", "PS1", "MGS")
+    session_id = open_session(conn, game_id, "duckstation")
+    close_session(conn, session_id)
+    conn.execute(
+        "UPDATE sessions SET started_at = '2026-07-09 22:00:00', duration_s = 900 WHERE id = ?",
+        (session_id,),
+    )
+    conn.commit()
+
+    result = get_activity_stats(conn)
+    by_hour = {h["hour"]: h["total_seconds"] for h in result["by_hour"]}
+    assert by_hour[19] == 900  # 22:00 UTC -> 19:00 America/Sao_Paulo
 
 
 # --- get_recent_sessions ---

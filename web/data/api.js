@@ -14,4 +14,5 @@ async function apiFetch(path) {
 export const fetchGames         = ()  => apiFetch('/games');
 export const fetchActiveSession = ()  => apiFetch('/sessions/active');
 export const fetchStats         = ()  => apiFetch('/stats/summary');
+export const fetchActivity      = ()  => apiFetch('/stats/activity');
 export const fetchGameDetail    = (id) => apiFetch(`/games/${id}`);

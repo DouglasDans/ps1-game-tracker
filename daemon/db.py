@@ -1,5 +1,7 @@
 import sqlite3
 
+from daemon.activity import compute_activity_patterns
+
 
 def init_db(conn: sqlite3.Connection) -> None:
     conn.executescript("""
@@ -36,6 +38,9 @@ def init_db(conn: sqlite3.Connection) -> None:
         ("igdb_id", "INTEGER"),
         ("screenscraper_id", "INTEGER"),
         ("enrichment_retries", "INTEGER DEFAULT 0"),
+        ("summary", "TEXT"),
+        ("developer", "TEXT"),
+        ("game_modes", "TEXT"),
     ]:
         try:
             conn.execute(f"ALTER TABLE games ADD COLUMN {col} {typedef}")
@@ -51,6 +56,10 @@ def init_db(conn: sqlite3.Connection) -> None:
             COALESCE(g.canonical_name, COALESCE(g.display_name, g.file_path)) AS display_name,
             MIN(g.platform)                                                    AS platform,
             MIN(g.cover_url)                                                   AS cover_url,
+            MIN(g.genre)                                                       AS genre,
+            MIN(g.release_year)                                                AS release_year,
+            MIN(g.developer)                                                   AS developer,
+            MIN(g.game_modes)                                                  AS game_modes,
             COUNT(s.id)                                                        AS session_count,
             SUM(s.duration_s)                                                  AS total_seconds,
             MAX(s.started_at)                                                  AS last_played,
@@ -199,6 +208,9 @@ def update_game_enrichment(
     release_year: int | None = None,
     igdb_id: int | None = None,
     screenscraper_id: int | None = None,
+    summary: str | None = None,
+    developer: str | None = None,
+    game_modes: str | None = None,
 ) -> None:
     conn.execute(
         """
@@ -209,10 +221,14 @@ def update_game_enrichment(
             release_year     = COALESCE(?, release_year),
             igdb_id          = COALESCE(?, igdb_id),
             screenscraper_id = COALESCE(?, screenscraper_id),
+            summary          = COALESCE(?, summary),
+            developer        = COALESCE(?, developer),
+            game_modes       = COALESCE(?, game_modes),
             enriched_at      = datetime('now')
         WHERE id = ?
         """,
-        (display_name, cover_url, genre, release_year, igdb_id, screenscraper_id, game_id),
+        (display_name, cover_url, genre, release_year, igdb_id, screenscraper_id,
+         summary, developer, game_modes, game_id),
     )
     conn.commit()
 
@@ -227,7 +243,8 @@ def increment_enrichment_retries(conn: sqlite3.Connection, game_id: int) -> None
 
 def get_game_detail(conn: sqlite3.Connection, game_id: int) -> dict | None:
     game = conn.execute(
-        "SELECT id, file_path, display_name, platform, cover_url, genre, release_year, igdb_id, canonical_name "
+        "SELECT id, file_path, display_name, platform, cover_url, genre, release_year, igdb_id, canonical_name, "
+        "summary, developer, game_modes "
         "FROM games WHERE id = ?",
         (game_id,),
     ).fetchone()
@@ -300,6 +317,9 @@ def get_game_detail(conn: sqlite3.Connection, game_id: int) -> dict | None:
         "genre": game["genre"],
         "release_year": game["release_year"],
         "igdb_id": game["igdb_id"],
+        "summary": game["summary"],
+        "developer": game["developer"],
+        "game_modes": game["game_modes"],
         "total_seconds": summary["total_seconds"],
         "session_count": summary["session_count"],
         "last_played": summary["last_played"],
@@ -381,6 +401,13 @@ def get_stats_summary(conn: sqlite3.Connection) -> dict:
     }
 
 
+def get_activity_stats(conn: sqlite3.Connection) -> dict:
+    rows = conn.execute(
+        "SELECT started_at, duration_s FROM sessions WHERE ended_at IS NOT NULL"
+    ).fetchall()
+    return compute_activity_patterns([dict(r) for r in rows])
+
+
 def get_recent_sessions(conn: sqlite3.Connection, limit: int = 20) -> list[dict]:
     rows = conn.execute(
         """
@@ -401,7 +428,8 @@ def get_recent_sessions(conn: sqlite3.Connection, limit: int = 20) -> list[dict]
 
 def get_games(conn: sqlite3.Connection) -> list[dict]:
     rows = conn.execute(
-        "SELECT id, file_path, display_name, platform, cover_url, "
+        "SELECT id, file_path, display_name, platform, cover_url, genre, release_year, "
+        "developer, game_modes, "
         "session_count, total_seconds, last_played, last_source FROM playtime_summary"
     ).fetchall()
     return [dict(r) for r in rows]

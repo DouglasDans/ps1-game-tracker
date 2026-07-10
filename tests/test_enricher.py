@@ -16,6 +16,12 @@ IGDB_RESPONSE = [
         "cover": {"id": 545996, "image_id": "cobpak"},
         "genres": [{"id": 5, "name": "Shooter"}, {"id": 24, "name": "Tactical"}],
         "first_release_date": 904780800,
+        "summary": "A stealth game about Solid Snake infiltrating Shadow Moses Island.",
+        "involved_companies": [
+            {"company": {"name": "Konami"}, "developer": True, "publisher": False},
+            {"company": {"name": "Konami Digital Entertainment"}, "developer": False, "publisher": True},
+        ],
+        "game_modes": [{"name": "Single player"}],
     }
 ]
 
@@ -24,7 +30,8 @@ def _row(conn, file_path: str) -> dict:
     return dict(
         conn.execute(
             "SELECT id, file_path, display_name, platform, canonical_name, "
-            "enriched_at, enrichment_retries, cover_url, igdb_id, release_year, genre "
+            "enriched_at, enrichment_retries, cover_url, igdb_id, release_year, genre, "
+            "summary, developer, game_modes "
             "FROM games WHERE file_path = ?",
             (file_path,),
         ).fetchone()
@@ -42,6 +49,9 @@ def test_enrich_game_igdb_success(conn):
              "genre": "Shooter, Tactical",
              "release_year": 1998,
              "igdb_id": 375,
+             "summary": "A stealth game about Solid Snake infiltrating Shadow Moses Island.",
+             "developer": "Konami",
+             "game_modes": "Single player",
          }):
         result = enrich_game(conn, game, IGDB_CONFIG)
 
@@ -53,6 +63,9 @@ def test_enrich_game_igdb_success(conn):
     assert row["cover_url"] is not None
     assert row["release_year"] == 1998
     assert row["genre"] == "Shooter, Tactical"
+    assert row["summary"] == "A stealth game about Solid Snake infiltrating Shadow Moses Island."
+    assert row["developer"] == "Konami"
+    assert row["game_modes"] == "Single player"
 
 
 def test_enrich_game_igdb_not_found_increments_retries(conn):
@@ -121,6 +134,29 @@ def test_igdb_search_includes_platform_filter():
     assert result["cover_url"] == "https://images.igdb.com/igdb/image/upload/t_cover_big/cobpak.jpg"
     assert result["genre"] == "Shooter, Tactical"
     assert result["release_year"] == 1998
+    assert result["summary"] == "A stealth game about Solid Snake infiltrating Shadow Moses Island."
+    assert result["developer"] == "Konami"
+    assert result["game_modes"] == "Single player"
+
+
+def test_igdb_search_joins_multiple_developers():
+    response = [{
+        "id": 1,
+        "name": "Co-Dev Game",
+        "involved_companies": [
+            {"company": {"name": "Studio A"}, "developer": True, "publisher": False},
+            {"company": {"name": "Studio B"}, "developer": True, "publisher": False},
+            {"company": {"name": "Publisher Only"}, "developer": False, "publisher": True},
+        ],
+    }]
+    mock_resp = MagicMock()
+    mock_resp.json.return_value = response
+    mock_resp.raise_for_status = MagicMock()
+
+    with patch("daemon.enricher.requests.post", return_value=mock_resp):
+        result = _igdb_search("Co-Dev Game", "PS1", "tok", "cid")
+
+    assert result["developer"] == "Studio A, Studio B"
 
 
 def test_igdb_search_omits_platform_filter_for_unknown_platform():
@@ -175,3 +211,6 @@ def test_igdb_search_handles_missing_cover():
     assert result["cover_url"] is None
     assert result["genre"] is None
     assert result["release_year"] is None
+    assert result["summary"] is None
+    assert result["developer"] is None
+    assert result["game_modes"] is None

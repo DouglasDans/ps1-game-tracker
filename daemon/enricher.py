@@ -119,7 +119,10 @@ def _igdb_search(
 ) -> dict | None:
     platform_id = _IGDB_PLATFORM_IDS.get(platform) if platform else None
 
-    query = f'search "{canonical_name}"; fields name,genres.name,cover.image_id,first_release_date; '
+    query = (
+        f'search "{canonical_name}"; fields name,genres.name,cover.image_id,first_release_date,'
+        "summary,involved_companies.company.name,involved_companies.developer,game_modes.name; "
+    )
     if platform_id:
         query += f"where platforms = ({platform_id}); "
     query += "limit 5;"
@@ -153,12 +156,28 @@ def _igdb_search(
     if "first_release_date" in game:
         release_year = datetime.fromtimestamp(game["first_release_date"]).year
 
+    developer = None
+    if "involved_companies" in game:
+        names = [
+            ic["company"]["name"]
+            for ic in game["involved_companies"]
+            if ic.get("developer") and "company" in ic
+        ]
+        developer = ", ".join(names) if names else None
+
+    game_modes = None
+    if "game_modes" in game:
+        game_modes = ", ".join(m["name"] for m in game["game_modes"])
+
     return {
         "display_name": game["name"],
         "cover_url": cover_url,
         "genre": genre,
         "release_year": release_year,
         "igdb_id": game["id"],
+        "summary": game.get("summary"),
+        "developer": developer,
+        "game_modes": game_modes,
     }
 
 

@@ -14,6 +14,7 @@ from fastapi.staticfiles import StaticFiles
 from daemon.db import (
     crash_recovery,
     get_active_session,
+    get_activity_stats,
     get_game_detail,
     get_games,
     get_recent_sessions,
@@ -256,6 +257,11 @@ def game_detail(game_id: int):
 @app.get("/stats/summary")
 def stats_summary():
     return get_stats_summary(app.state.conn)
+
+
+@app.get("/stats/activity")
+def stats_activity():
+    return get_activity_stats(app.state.conn)
 
 
 @app.post("/admin/reset-enrichment")

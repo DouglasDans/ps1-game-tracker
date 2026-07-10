@@ -1,4 +1,4 @@
-import { fetchGames, fetchActiveSession, fetchStats } from '../data/api.js';
+import { fetchGames, fetchActiveSession, fetchStats, fetchActivity } from '../data/api.js';
 import { fmtTime, fmtDate, fmtDateShort, fmtSource, cardGradient, platformLogoImg } from '../utils.js';
 
 const CARD_W         = 130;
@@ -18,8 +18,8 @@ export function mount(container, navigate, params = {}) {
 
   container.innerHTML = '<div style="padding:40px;color:var(--text-muted);text-align:center">Carregando...</div>';
 
-  Promise.all([fetchGames(), fetchActiveSession(), fetchStats()])
-    .then(([games, active, stats]) => {
+  Promise.all([fetchGames(), fetchActiveSession(), fetchStats(), fetchActivity()])
+    .then(([games, active, stats, activity]) => {
       if (cancelled) return;
 
       const sorted = [...games].sort((a, b) => new Date(b.last_played) - new Date(a.last_played));
@@ -28,7 +28,7 @@ export function mount(container, navigate, params = {}) {
         if (activeIdx > 0) sorted.unshift(sorted.splice(activeIdx, 1)[0]);
       }
       const items = [...sorted.slice(0, 10), { id: 'library', display_name: 'Library', _lib: true }];
-      container.innerHTML = buildHTML(items, selectedIndex, active, stats, games);
+      container.innerHTML = buildHTML(items, selectedIndex, active, stats, games, activity);
       updateHero(items[selectedIndex], active, games);
       scrollRow(selectedIndex);
 
@@ -126,7 +126,7 @@ function refresh(items, selectedIndex, active, games) {
   scrollRow(selectedIndex);
 }
 
-function buildHTML(items, selectedIndex, active, stats, games) {
+function buildHTML(items, selectedIndex, active, stats, games, activity) {
   const cards = items.map((item, i) => {
     const sel = i === selectedIndex ? ' selected' : '';
     if (item._lib) {
@@ -174,12 +174,43 @@ function buildHTML(items, selectedIndex, active, stats, games) {
       </div>
     </div>
     <div class="section-stats" id="section-stats">
-      ${buildStatsHTML(stats, games)}
+      ${buildStatsHTML(stats, games, activity)}
     </div>
   </div>`;
 }
 
-function buildStatsHTML(stats, games) {
+function aggregateBy(games, keyFn, fallbackLabel) {
+  const totals = new Map();
+  for (const g of games) {
+    const key = keyFn(g) ?? fallbackLabel;
+    totals.set(key, (totals.get(key) ?? 0) + (g.total_seconds ?? 0));
+  }
+  const grandTotal = [...totals.values()].reduce((a, b) => a + b, 0);
+  return [...totals.entries()]
+    .map(([label, total_seconds]) => ({
+      label,
+      total_seconds,
+      pct: grandTotal ? Math.round((total_seconds / grandTotal) * 100) : 0,
+    }))
+    .sort((a, b) => b.total_seconds - a.total_seconds);
+}
+
+function decadeOf(year) {
+  if (!year) return null;
+  return `${Math.floor(year / 10) * 10}s`;
+}
+
+function barRow(label, total_seconds, pct) {
+  return `<div class="platform-bar-row">
+    <div class="platform-bar-logo stat-label-wide"><span class="platform-text" title="${label}">${label}</span></div>
+    <div class="platform-bar-track">
+      <div class="platform-bar-fill" style="width:${pct}%"></div>
+    </div>
+    <div class="platform-bar-value">${fmtTime(total_seconds)}</div>
+  </div>`;
+}
+
+function buildStatsHTML(stats, games, activity) {
   const s = stats;
   const topGames = [...games].sort((a, b) => b.total_seconds - a.total_seconds).slice(0, 8);
 
@@ -206,6 +237,30 @@ function buildStatsHTML(stats, games) {
     </div>`;
   }).join('');
 
+  const genreBars = aggregateBy(games, g => g.genre, 'Sem gênero')
+    .slice(0, 6)
+    .map(g => barRow(g.label, g.total_seconds, g.pct))
+    .join('');
+
+  const decadeBars = aggregateBy(games, g => decadeOf(g.release_year), 'Desconhecida')
+    .map(d => barRow(d.label, d.total_seconds, d.pct))
+    .join('');
+
+  const weekdayBars = (activity?.by_weekday ?? []).map(d => {
+    const grand = activity.by_weekday.reduce((a, b) => a + b.total_seconds, 0);
+    const pct = grand ? Math.round((d.total_seconds / grand) * 100) : 0;
+    return barRow(d.day, d.total_seconds, pct);
+  }).join('');
+
+  const developerBars = aggregateBy(games, g => g.developer, 'Desconhecida')
+    .slice(0, 6)
+    .map(d => barRow(d.label, d.total_seconds, d.pct))
+    .join('');
+
+  const gameModeBars = aggregateBy(games, g => g.game_modes, 'Desconhecido')
+    .map(m => barRow(m.label, m.total_seconds, m.pct))
+    .join('');
+
   return `
     <div class="stats-scroll-hint">↑ <span>GAMES</span></div>
 
@@ -225,6 +280,11 @@ function buildStatsHTML(stats, games) {
         <div class="stats-card-value">${fmtTime(s.longest_session?.duration_s)}</div>
         <div class="stats-card-sub">${s.longest_session?.display_name ?? '—'} · ${fmtDate(s.longest_session?.started_at)}</div>
       </div>
+      <div class="stats-card">
+        <div class="stats-card-label">Sequência</div>
+        <div class="stats-card-value">${activity?.current_streak ?? 0}d</div>
+        <div class="stats-card-sub">recorde: ${activity?.longest_streak ?? 0} dias seguidos</div>
+      </div>
     </div>
 
     <div class="stats-columns">
@@ -235,6 +295,32 @@ function buildStatsHTML(stats, games) {
       <div class="stats-col">
         <div class="section-header">Mais jogados</div>
         <div class="top-games-list" style="margin-top:16px">${topList}</div>
+      </div>
+    </div>
+
+    <div class="stats-columns stats-columns-3">
+      <div class="stats-col">
+        <div class="section-header">Por gênero</div>
+        <div class="platform-bars" style="margin-top:16px">${genreBars}</div>
+      </div>
+      <div class="stats-col">
+        <div class="section-header">Por década</div>
+        <div class="platform-bars" style="margin-top:16px">${decadeBars}</div>
+      </div>
+      <div class="stats-col">
+        <div class="section-header">Dia da semana</div>
+        <div class="platform-bars" style="margin-top:16px">${weekdayBars}</div>
+      </div>
+    </div>
+
+    <div class="stats-columns">
+      <div class="stats-col">
+        <div class="section-header">Por desenvolvedora</div>
+        <div class="platform-bars" style="margin-top:16px">${developerBars}</div>
+      </div>
+      <div class="stats-col">
+        <div class="section-header">Por modo de jogo</div>
+        <div class="platform-bars" style="margin-top:16px">${gameModeBars}</div>
       </div>
     </div>`;
 }
