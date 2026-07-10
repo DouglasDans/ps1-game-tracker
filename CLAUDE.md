@@ -1,9 +1,29 @@
 # PS1 Game Tracker
 
-> Daemon de tracking de tempo de jogo estilo Steam para o PS1 Pro (Raspberry Pi 5 em case PSOne SCPH-9001). Detecta sessões automaticamente, sem intervenção manual. Dados locais em SQLite com espelho no Notion.
+> Centro de informações do PS1 Pro: daemon + interface única controlada por controle, exibida na TV (1080p). Rastreia sessões de jogo automaticamente (estilo Steam), agrega estatísticas e, no futuro, expõe informações do próprio console. Dados locais em SQLite com espelho no Notion.
 
 Documentação completa do escopo: https://www.notion.so/PS1-Pro-Session-Tracker-Escopo-do-Projeto-36327b83275c80f797e0dfd09e479892
 Acesso via MCP: `mcp__claude_ai_Notion__notion-fetch` com a URL acima.
+
+---
+
+## Visão do produto
+
+Tudo numa interface única, navegada 100% por controle, na TV. Dois pilares, nesta ordem de prioridade:
+
+1. **Games** — informações e listas de jogos, horas por jogo, trackeamento completo de sessões, e o máximo de estatísticas qualitativas que os dados permitirem. A integração com **RetroAchievements (Fase 6) é prioridade** para o usuário.
+2. **Console** — informações do sistema do PS1 Pro: armazenamento, RAM, uso de CPU/GPU e configurações do sistema (escopo exato ainda a definir).
+
+## O que é o PS1 Pro
+
+Mini console retro construído pelo usuário: um **Raspberry Pi 5** (Debian 13 Trixie, aarch64) montado num case de **PlayStation 1 original (SCPH-9001)**, que boota direto num launcher — sem desktop/X11 — e é operado inteiramente por controle (DualShock 3 via Bluetooth).
+
+- **PS1 OSD Launcher** (`~/ps1-osd-laucher` no Pi): launcher Python/pygame que imita o BIOS do PS1; serviço systemd, sobe no boot.
+- **Emuladores**: DuckStation e SwanStation/PCSX-ReARMed (PS1), PPSSPP (PSP), Flycast (Dreamcast), RetroArch (multi) + PS2 real via OPL/SMB numa rede ethernet isolada (192.168.0.0/24).
+- **Rede**: WiFi com IP estático `192.168.1.150`.
+- **Armazenamento**: SD para o OS + pendrive USB 116GB NTFS para as ROMs (`/mnt/usb-flash`).
+- **Extras**: YouTube TV via Chromium kiosk (Wayland/cage), backup de saves via rclone → Google Drive.
+- **Este projeto** é a camada de tracking + dashboard desse ecossistema.
 
 ---
 
@@ -67,9 +87,18 @@ ps1-game-tracker/
 ├── sync/
 │   └── notion_sync.py       # Notion sync periódico [FASE 5]
 ├── web/
-│   ├── index.html           # MVP: tabela HTML simples [FASE 1]
-│   ├── style.css            # XMB-inspired dark theme [FASE 4]
-│   └── app.js               # Gamepad API navigation [FASE 4]
+│   ├── index.html           # shell mínimo: carrega app.js como módulo
+│   ├── app.js               # roteador de telas + top/bottom bar + Gamepad API
+│   ├── utils.js             # formatação (tempo/data), logos de plataforma, gradientes
+│   ├── style.css            # dark theme 10-foot p/ TV 1080p (contraste AA, tipografia grande)
+│   ├── screens/
+│   │   ├── home.js          # carrossel de recentes + hero + seção de stats globais
+│   │   ├── detail.js        # detalhe do jogo: stats estendidas + histórico de sessões
+│   │   └── library.js       # grid completo com filtros por plataforma (L1/R1)
+│   ├── data/
+│   │   ├── api.js           # fetch da API (same-origin em prod; Pi em dev local)
+│   │   └── mock.js
+│   └── assets/              # logos de plataforma (ps1/ps2/psp/dc/sega)
 ├── tests/
 │   ├── conftest.py
 │   ├── test_db.py
@@ -173,7 +202,7 @@ Sessões sem `ended_at` com `heartbeat_at` > 5 minutos atrás são consideradas 
 ```toml
 [daemon]
 poll_interval_s = 3
-port = 8080
+port = 9876          # porta real usada no Pi
 db_path = "~/.local/share/ps1-tracker/tracker.db"
 
 [watchers]
@@ -246,10 +275,11 @@ curl -s http://192.168.1.150:9876/sessions/active | python3 -m json.tool
 | 1.6 — Dedup multi-disco | ✅     | normalize_game_name strip all trailing `(...)` + canonical_name + session flip fix              |
 | 2 — Captura completa    | ✅     | samba_watcher (PS2) + lrtl_importer (RetroArch)                                                 |
 | 3 — Enriquecimento      | ✅     | IGDB enricher (background thread, throttle, retry)                                              |
-| 4 — Frontend XMB        | ⬜     | Gamepad API + dark theme estilo XrossMediaBar                                                   |
+| 4 — Frontend TV         | ✅     | Home/Detail/Library, Gamepad API, dark theme 10-foot, stats globais e por jogo                  |
 | 5 — Notion Sync         | ⬜     | Push sessão + cron diário                                                                       |
-| 6 — RetroAchievements   | ⬜     | Hash PS1 rcheevos-compatible + achievements + progresso                                         |
+| 6 — RetroAchievements   | ⬜     | **Prioridade.** Hash PS1 rcheevos-compatible + achievements + progresso                         |
 | 7 — Produção            | ⬜     | OSD Launcher integration + config completo                                                      |
+| 8 — Console info        | ⬜     | Novo pilar: armazenamento, RAM, uso de CPU/GPU, configs do sistema (escopo a detalhar)          |
 
 ### MVP validado no Pi (2026-05-23)
 
@@ -269,5 +299,7 @@ Confirmado em produção com DuckStation AppImage + PPSSPP:
 **Fase 1.6 concluída (2026-05-23):** `normalize_game_name` strip iterativo de todos os grupos `(...)` finais — região, versão, track, disco. `SessionManager` compara por `canonical_name` evitando session flip quando DuckStation alterna entre fds de tracks. `playtime_summary` agrega por `canonical_name`. Descoberta relevante: DuckStation não mantém `.cue` aberto — apenas os `.bin` dos tracks ficam nos fds.
 
 **Fase 2 concluída (2026-05-23):** `samba_watcher` parseia `smbstatus -L` para detectar ISOs PS2/OPL abertas via SMB (requer entrada no sudoers). `lrtl_importer` lê `.lrtl` do RetroArch e importa sessões por delta em relação ao acumulado já no DB — disparado no startup e quando o processo RetroArch encerra. Novos campos opcionais no config: `samba_rom_dirs`, `retroarch_playlist_dirs`, `samba_debounce_polls` (default 3 — OPL solta o lock brevemente durante boot). `strip_ps2_serial` em `session_manager.py` remove o prefixo serial OPL (`SLUS_NNN.NN.`) do display_name/canonical_name. `lrtl_importer` aplica `normalize_game_name` no stem do `.lrtl` para que histórico RetroArch e procfs agregem corretamente na `playtime_summary`.
+
+**Fase 4 concluída (2026-05-31, polish TV em 2026-07-09):** frontend em vanilla JS com módulos ES (`app.js` roteia `screens/home|detail|library`). Gamepad API mapeia botões para KeyboardEvents sintéticos (✕=Enter, ○=Escape, □=Square, L1/R1, d-pad). Passe de usabilidade TV (2026-07-09): scroll por setas no detail e na seção de stats, contraste `--text-muted` corrigido para ~6.2:1, escala tipográfica 10-foot, hints de rodapé contextuais por tela, polling de `/sessions/active` a cada 10s, "Mais jogados" com capas reais + % do tempo total, API/host derivados da origem da página (IP do Pi pode mudar sem quebrar).
 
 **Fase 3 concluída (2026-05-30):** `daemon/enricher.py` — IGDB como único enricher (ScreenScraper descartado). `enrich_game` busca por `canonical_name` + filtro de platform (PS1=7, PS2=8, PSP=38); plataformas não mapeadas buscam sem filtro. Thread de background com fila (`enricher_loop`): seeded no startup com todos os jogos `enriched_at IS NULL`, e enfileira novos jogos detectados pelo polling loop. Throttle de 0.3s entre requests para respeitar 4 req/s do IGDB. `RateLimitError` (429): não incrementa `enrichment_retries` — game re-enfileirado após sleep de 10s. Desiste após 3 boots com falha (`enrichment_retries >= 3`). Token Twitch cacheado em `igdb_token.json` ao lado do DB (~62 dias). Schema: campo `enrichment_retries INTEGER DEFAULT 0` adicionado via `ALTER TABLE`. Configurar no Pi: adicionar `[igdb]` com `client_id` e `client_secret` ao `config.toml`.
