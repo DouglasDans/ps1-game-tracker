@@ -72,7 +72,7 @@ function buildHTML(d) {
       <div class="detail-info">
         <div class="detail-platform-row">
           ${logo ? `<img src="${logo}" alt="${d.platform}" class="detail-platform-logo">` : ''}
-          <span class="detail-meta-text">${[d.platform, d.release_year, d.genre, d.developer, d.game_modes].filter(Boolean).join(' · ')}</span>
+          <span class="detail-meta-text">${[logo ? null : d.platform, d.release_year, d.genre, d.developer, d.game_modes].filter(Boolean).join(' · ')}</span>
         </div>
         <h1 class="detail-title">${d.display_name}</h1>
         <div class="detail-stats-row">

@@ -354,7 +354,7 @@ function updateHero(item, active, games) {
     badge.hidden = true;
   }
 
-  platformInfo.innerHTML = `${platformLogoImg(item.platform, 'hero-platform-logo')} ${item.platform || ''} · ${fmtTime(item.total_seconds)} TOTAL`;
+  platformInfo.innerHTML = `${item.platform ? `${platformLogoImg(item.platform, 'hero-platform-logo')} · ` : ''}${fmtTime(item.total_seconds)} TOTAL`;
   title.textContent = item.display_name;
   lastSession.textContent = fmtDateShort(item.last_played);
   emulator.textContent = fmtSource(item.last_source);
