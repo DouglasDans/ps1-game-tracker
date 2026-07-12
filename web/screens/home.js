@@ -1,5 +1,5 @@
 import { fetchGames, fetchActiveSession, fetchStats, fetchActivity } from '../data/api.js';
-import { fmtTime, fmtDate, fmtDateShort, fmtSource, cardGradient, platformLogoImg } from '../utils.js';
+import { fmtTime, fmtDate, fmtDateShort, fmtSource, cardGradient, platformLogoImg, extractDominantColor } from '../utils.js';
 
 const CARD_W         = 130;
 const CARD_GAP       = 14;
@@ -148,6 +148,7 @@ function buildHTML(items, selectedIndex, active, stats, games, activity) {
 
   return `<div class="screen-home">
     <div class="section-home" id="section-home">
+      <div class="home-backdrop" id="home-backdrop"></div>
       <div class="hero">
         <div class="hero-meta">
           <span class="badge badge-active" id="hero-badge" hidden></span>
@@ -367,7 +368,33 @@ function buildStatsHTML(stats, games, activity) {
     </div>`;
 }
 
+let _backdropToken = 0;
+
+function updateBackdrop(item) {
+  const el = document.getElementById('home-backdrop');
+  if (!el) return;
+  const token = ++_backdropToken;
+
+  if (item._lib) {
+    el.classList.remove('visible');
+    return;
+  }
+  if (!item.cover_url) {
+    el.style.background =
+      `linear-gradient(180deg, rgba(13, 13, 26, 0.55) 0%, rgba(13, 13, 26, 0.85) 55%, var(--bg) 85%), ${cardGradient(item.display_name)}`;
+    el.classList.add('visible');
+    return;
+  }
+  extractDominantColor(item.cover_url).then(c => {
+    if (!c || token !== _backdropToken || !el.isConnected) return;
+    el.style.background =
+      `linear-gradient(70deg, rgba(${c}, 0.5) 0%, rgba(${c}, 0.16) 45%, transparent 75%)`;
+    el.classList.add('visible');
+  });
+}
+
 function updateHero(item, active, games) {
+  updateBackdrop(item);
   const badge        = document.getElementById('hero-badge');
   const platformInfo = document.getElementById('hero-platform-info');
   const title        = document.getElementById('hero-title');
