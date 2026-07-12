@@ -239,15 +239,111 @@ body {
   align-items: start;
 }
 
-.stats-columns-3 {
-  grid-template-columns: 1fr 1fr 1fr;
-  gap: 36px;
-}
-
 .stats-col {
   display: flex;
   flex-direction: column;
   gap: 0;
+}
+
+/* Weekday column chart */
+.weekday-chart {
+  display: flex;
+  gap: 12px;
+  align-items: stretch;
+  height: 230px;
+  margin-top: 16px;
+}
+
+.wd-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.wd-value {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.wd-col.peak .wd-value {
+  color: var(--text);
+  font-weight: 700;
+}
+
+.wd-bar-wrap {
+  flex: 1;
+  width: 100%;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.wd-bar {
+  width: 70%;
+  background: var(--accent);
+  border-radius: 5px 5px 0 0;
+  min-height: 2px;
+}
+
+.wd-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+/* Period-of-day cards */
+.period-cards {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 14px;
+  margin-top: 16px;
+}
+
+.period-card {
+  background: var(--bg-raised);
+  border-radius: 10px;
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.period-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.period-icon {
+  font-size: 0.95rem;
+}
+
+.period-value {
+  font-size: 1.5rem;
+  font-weight: 800;
+  line-height: 1.1;
+  color: var(--text-dim);
+}
+
+.period-card.peak .period-value {
+  color: var(--text);
+}
+
+.period-sub {
+  font-size: 0.75rem;
+  color: var(--text-muted);
 }
 
 /* Top games list */
@@ -658,9 +754,13 @@ body {
 .detail-insights {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 4px;
   min-height: 0;
   overflow: hidden;
+}
+
+.detail-insights .section-header {
+  margin-bottom: 10px;
 }
 
 .insight-row {
@@ -668,6 +768,9 @@ body {
   align-items: baseline;
   justify-content: space-between;
   gap: 12px;
+  padding: 12px 16px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.02);
 }
 
 .insight-label {
@@ -676,7 +779,7 @@ body {
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--text-muted);
-  flex-shrink: 0;
+  line-height: 1.4;
 }
 
 .insight-value {
@@ -684,6 +787,8 @@ body {
   font-weight: 700;
   color: var(--text);
   text-align: right;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .insight-sub {
