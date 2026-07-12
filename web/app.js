@@ -50,10 +50,12 @@ const SCREEN_HINTS = {
   library: `
     <span class="hint"><span class="hint-btn">✕</span> Selecionar</span>
     <span class="hint"><span class="hint-btn">○</span> Voltar</span>
+    <span class="hint"><span class="hint-btn">←</span> Filtros</span>
     <span class="hint"><span class="hint-btn hint-btn-wide">L1</span><span class="hint-btn hint-btn-wide">R1</span> Filtro</span>`,
   detail: `
     <span class="hint"><span class="hint-btn">○</span> Voltar</span>
-    <span class="hint"><span class="hint-btn">↑</span><span class="hint-btn">↓</span> Rolar</span>`,
+    <span class="hint"><span class="hint-btn">↑</span><span class="hint-btn">↓</span> Seções</span>
+    <span class="hint"><span class="hint-btn">→</span> Rolar conteúdo</span>`,
 };
 
 function updateHints(screen) {

@@ -25,23 +25,23 @@ export function mount(container, navigate, params = {}) {
       };
 
       const rail = TABS.map((t, i) =>
-        `<div class="stats-tab${i === tabIndex ? ' active' : ''}" data-tab="${t.key}">${t.label}</div>`
+        `<div class="rail-item${i === tabIndex ? ' active' : ''}" data-tab="${t.key}">${t.label}</div>`
       ).join('');
 
       container.innerHTML = `<div class="screen-stats">
-        <aside class="stats-rail">${rail}</aside>
+        <aside class="side-rail">${rail}</aside>
         <div class="stats-content" id="stats-content">${content[TABS[tabIndex].key]}</div>
       </div>`;
 
       function setTab(i) {
         tabIndex = i;
-        container.querySelectorAll('.stats-tab').forEach((el, j) => {
+        container.querySelectorAll('.rail-item').forEach((el, j) => {
           el.classList.toggle('active', j === tabIndex);
         });
         document.getElementById('stats-content').innerHTML = content[TABS[tabIndex].key];
       }
 
-      container.querySelectorAll('.stats-tab').forEach((el, i) => {
+      container.querySelectorAll('.rail-item').forEach((el, i) => {
         el.addEventListener('click', () => setTab(i));
       });
 
@@ -98,6 +98,13 @@ const DAY_PERIODS = [
   { label: 'Noite', icon: '🌆', from: 18, to: 23 },
 ];
 
+function panel(title, body) {
+  return `<div class="stat-panel">
+    <div class="section-header">${title}</div>
+    ${body}
+  </div>`;
+}
+
 function barRow(label, total_seconds, pct) {
   return `<div class="platform-bar-row">
     <div class="platform-bar-logo stat-label-wide"><span class="platform-text" title="${label}">${label}</span></div>
@@ -148,10 +155,7 @@ function buildOverview(s, games, activity) {
       </div>
     </div>
 
-    <div>
-      <div class="section-header">Mais jogados</div>
-      <div class="top-games-list top-games-wide" style="margin-top:16px">${topList}</div>
-    </div>`;
+    ${panel('Mais jogados', `<div class="top-games-list top-games-wide">${topList}</div>`)}`;
 }
 
 function buildActivity(activity) {
@@ -183,14 +187,8 @@ function buildActivity(activity) {
     </div>`).join('');
 
   return `
-    <div>
-      <div class="section-header">Dia da semana</div>
-      <div class="weekday-chart">${weekdayCols}</div>
-    </div>
-    <div>
-      <div class="section-header">Período do dia</div>
-      <div class="period-cards period-cards-row">${periodCards}</div>
-    </div>`;
+    ${panel('Dia da semana', `<div class="weekday-chart">${weekdayCols}</div>`)}
+    ${panel('Período do dia', `<div class="period-cards period-cards-row">${periodCards}</div>`)}`;
 }
 
 function buildLibraryTab(s, games) {
@@ -225,18 +223,13 @@ function buildLibraryTab(s, games) {
   return `
     <div class="stats-columns">
       <div class="stats-col">
-        <div class="section-header">Por plataforma</div>
-        <div class="platform-bars" style="margin-top:16px">${bars}</div>
-        <div class="section-header" style="margin-top:32px">Por gênero</div>
-        <div class="platform-bars" style="margin-top:16px">${genreBars}</div>
+        ${panel('Por plataforma', `<div class="platform-bars">${bars}</div>`)}
+        ${panel('Por gênero', `<div class="platform-bars">${genreBars}</div>`)}
       </div>
       <div class="stats-col">
-        <div class="section-header">Por desenvolvedora</div>
-        <div class="platform-bars" style="margin-top:16px">${developerBars}</div>
-        <div class="section-header" style="margin-top:32px">Por década</div>
-        <div class="platform-bars" style="margin-top:16px">${decadeBars}</div>
-        <div class="section-header" style="margin-top:32px">Por modo de jogo</div>
-        <div class="platform-bars" style="margin-top:16px">${gameModeBars}</div>
+        ${panel('Por desenvolvedora', `<div class="platform-bars">${developerBars}</div>`)}
+        ${panel('Por década', `<div class="platform-bars">${decadeBars}</div>`)}
+        ${panel('Por modo de jogo', `<div class="platform-bars">${gameModeBars}</div>`)}
       </div>
     </div>`;
 }

@@ -1,5 +1,5 @@
 import { fetchGames } from '../data/api.js';
-import { fmtTime, cardGradient, getPlatformLogo } from '../utils.js';
+import { fmtTime, cardGradient } from '../utils.js';
 
 const SORT_MODES = [
   { key: 'top',    label: 'Mais jogado', cmp: (a, b) => (b.total_seconds ?? 0) - (a.total_seconds ?? 0) },
@@ -24,7 +24,7 @@ export function mount(container, navigate, params = {}) {
   let platformFilter = params.platformFilter ?? 'all';
   let sortIndex = 0;
   let focus = 'grid';
-  let filterIndex = 0;
+  let railIndex = 0;
   let onKeyHandler = null;
   let cancelled = false;
 
@@ -35,6 +35,8 @@ export function mount(container, navigate, params = {}) {
       if (cancelled) return;
 
       const platforms = ['all', ...new Set(allGames.map(g => g.platform).filter(Boolean))];
+      // Rail rows: one per platform filter, then the sort toggle at the end.
+      const railCount = platforms.length + 1;
 
       function filtered() {
         const base = platformFilter === 'all' ? allGames : allGames.filter(g => g.platform === platformFilter);
@@ -42,60 +44,56 @@ export function mount(container, navigate, params = {}) {
       }
 
       function refreshGrid(games) {
-        container.querySelector('.library-grid').innerHTML = gridHTML(games, selectedIndex);
+        container.querySelector('.library-grid').innerHTML = gridHTML(games, focus === 'grid' ? selectedIndex : -1);
         const selectedCard = container.querySelector('.lib-card.selected');
         if (selectedCard) {
           const cols = computeCols(container);
           if (selectedIndex < cols) {
-            container.querySelector('.screen-library').scrollTo({ top: 0, behavior: 'smooth' });
+            container.querySelector('.library-main').scrollTo({ top: 0, behavior: 'smooth' });
           } else {
             selectedCard.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
           }
         }
-        container.querySelectorAll('.lib-card').forEach((card, i) => {
-          card.addEventListener('click', () => navigate('detail', { gameId: Number(card.dataset.id), from: 'library', libraryIndex: i, libraryFilter: platformFilter }));
-        });
+        attachCardListeners();
       }
 
-      function refreshFilters() {
-        container.querySelectorAll('.filter-chip').forEach((c, i) => {
-          c.classList.toggle('active', platforms[i] === platformFilter);
-          c.classList.toggle('focused', focus === 'filters' && i === filterIndex);
+      function refreshRail() {
+        container.querySelectorAll('.side-rail .rail-item').forEach((el, i) => {
+          const isSort = i === railCount - 1;
+          el.classList.toggle('active', !isSort && platforms[i] === platformFilter);
+          el.classList.toggle('focused', focus === 'rail' && i === railIndex);
+          if (isSort) el.textContent = `Ordenar: ${SORT_MODES[sortIndex].label}`;
         });
-        const sortChip = container.querySelector('.sort-chip');
-        if (sortChip) {
-          sortChip.textContent = `ORDENAR: ${SORT_MODES[sortIndex].label.toUpperCase()}`;
-          sortChip.classList.toggle('focused', focus === 'filters' && filterIndex === platforms.length);
-        }
       }
 
       function setFilter(platform) {
         platformFilter = platform;
-        filterIndex = platforms.indexOf(platform);
         selectedIndex = 0;
-        refreshFilters();
+        refreshRail();
         refreshGrid(filtered());
       }
 
       function cycleSort() {
         sortIndex = (sortIndex + 1) % SORT_MODES.length;
         selectedIndex = 0;
-        refreshFilters();
+        refreshRail();
         refreshGrid(filtered());
       }
 
-      function attachChipListeners() {
-        container.querySelectorAll('.filter-chip[data-platform]').forEach(chip => {
-          chip.addEventListener('click', () => setFilter(chip.dataset.platform));
-        });
-        container.querySelector('.sort-chip')?.addEventListener('click', cycleSort);
+      function attachCardListeners() {
         container.querySelectorAll('.lib-card').forEach((card, i) => {
           card.addEventListener('click', () => navigate('detail', { gameId: Number(card.dataset.id), from: 'library', libraryIndex: i, libraryFilter: platformFilter }));
         });
       }
 
-      container.innerHTML = buildHTML(allGames, filtered(), selectedIndex, platformFilter, sortIndex);
-      attachChipListeners();
+      container.innerHTML = buildHTML(platforms, filtered(), selectedIndex, platformFilter, sortIndex);
+      container.querySelectorAll('.side-rail .rail-item').forEach((el, i) => {
+        el.addEventListener('click', () => {
+          if (i === railCount - 1) cycleSort();
+          else setFilter(platforms[i]);
+        });
+      });
+      attachCardListeners();
 
       if (selectedIndex > 0) {
         requestAnimationFrame(() => {
@@ -104,25 +102,22 @@ export function mount(container, navigate, params = {}) {
       }
 
       function onKey(e) {
-        if (focus === 'filters') {
+        if (focus === 'rail') {
           switch (e.key) {
-            case 'ArrowLeft':
-              filterIndex = Math.max(0, filterIndex - 1);
-              refreshFilters();
-              break;
-            case 'ArrowRight':
-              filterIndex = Math.min(platforms.length, filterIndex + 1);
-              refreshFilters();
-              break;
-            case 'Enter':
-              if (filterIndex === platforms.length) cycleSort();
-              else setFilter(platforms[filterIndex]);
-              focus = 'grid';
-              refreshFilters();
+            case 'ArrowUp':
+              if (railIndex > 0) { railIndex--; refreshRail(); }
               break;
             case 'ArrowDown':
+              if (railIndex < railCount - 1) { railIndex++; refreshRail(); }
+              break;
+            case 'Enter':
+              if (railIndex === railCount - 1) cycleSort();
+              else setFilter(platforms[railIndex]);
+              break;
+            case 'ArrowRight':
               focus = 'grid';
-              refreshFilters();
+              refreshRail();
+              refreshGrid(filtered());
               break;
             case 'Escape':
               navigate('home');
@@ -147,9 +142,19 @@ export function mount(container, navigate, params = {}) {
           case 'ArrowRight':
             if (selectedIndex < games.length - 1) { selectedIndex++; refreshGrid(games); }
             break;
-          case 'ArrowLeft':
-            if (selectedIndex > 0) { selectedIndex--; refreshGrid(games); }
+          case 'ArrowLeft': {
+            const cols = computeCols(container);
+            if (selectedIndex % cols === 0) {
+              focus = 'rail';
+              railIndex = platforms.indexOf(platformFilter);
+              refreshRail();
+              refreshGrid(games);
+            } else {
+              selectedIndex--;
+              refreshGrid(games);
+            }
             break;
+          }
           case 'ArrowDown': {
             const cols = computeCols(container);
             if (selectedIndex + cols < games.length) { selectedIndex += cols; refreshGrid(games); }
@@ -158,12 +163,6 @@ export function mount(container, navigate, params = {}) {
           case 'ArrowUp': {
             const cols = computeCols(container);
             if (selectedIndex - cols >= 0) { selectedIndex -= cols; refreshGrid(games); }
-            else {
-              focus = 'filters';
-              filterIndex = platforms.indexOf(platformFilter);
-              refreshFilters();
-              container.querySelector('.screen-library')?.scrollTo({ top: 0, behavior: 'smooth' });
-            }
             break;
           }
           case 'Enter':
@@ -189,20 +188,21 @@ export function mount(container, navigate, params = {}) {
   };
 }
 
-function buildHTML(allGames, games, selectedIndex, platformFilter, sortIndex) {
-  const platforms = ['all', ...new Set(allGames.map(g => g.platform).filter(Boolean))];
-  const chips = platforms.map(p => {
+function buildHTML(platforms, games, selectedIndex, platformFilter, sortIndex) {
+  const railItems = platforms.map(p => {
     const label = p === 'all' ? 'Todos' : p;
-    return `<span class="filter-chip${p === platformFilter ? ' active' : ''}" data-platform="${p}">${label}</span>`;
+    return `<div class="rail-item${p === platformFilter ? ' active' : ''}" data-platform="${p}">${label}</div>`;
   }).join('');
 
   return `<div class="screen-library">
-    <div class="library-header">
-      <span class="library-title">Biblioteca</span>
-      ${chips}
-      <span class="filter-chip sort-chip">ORDENAR: ${SORT_MODES[sortIndex].label.toUpperCase()}</span>
+    <aside class="side-rail">
+      ${railItems}
+      <div class="rail-separator"></div>
+      <div class="rail-item rail-sort">Ordenar: ${SORT_MODES[sortIndex].label}</div>
+    </aside>
+    <div class="library-main">
+      <div class="library-grid">${gridHTML(games, selectedIndex)}</div>
     </div>
-    <div class="library-grid">${gridHTML(games, selectedIndex)}</div>
   </div>`;
 }
 
