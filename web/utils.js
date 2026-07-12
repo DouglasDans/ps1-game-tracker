@@ -61,6 +61,48 @@ export function cardGradient(name) {
   return `linear-gradient(145deg, hsl(${hue},65%,38%), hsl(${(hue + 50) % 360},55%,18%))`;
 }
 
+const _colorCache = new Map();
+
+// Extracts a representative vibrant color from a cover image.
+// Requires CORS on the image host (images.igdb.com sends ACAO: *).
+// Resolves to "r, g, b" (for use in rgba()) or null on any failure.
+export function extractDominantColor(url) {
+  if (!url) return Promise.resolve(null);
+  if (_colorCache.has(url)) return Promise.resolve(_colorCache.get(url));
+  return new Promise(resolve => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      try {
+        const size = 24;
+        const canvas = document.createElement('canvas');
+        canvas.width = size;
+        canvas.height = size;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, size, size);
+        const { data } = ctx.getImageData(0, 0, size, size);
+        let r = 0, g = 0, b = 0, n = 0;
+        let ra = 0, ga = 0, ba = 0, na = 0;
+        for (let i = 0; i < data.length; i += 4) {
+          const R = data[i], G = data[i + 1], B = data[i + 2];
+          const max = Math.max(R, G, B), min = Math.min(R, G, B);
+          const sat = max - min, lum = (max + min) / 2;
+          ra += R; ga += G; ba += B; na++;
+          if (sat > 40 && lum > 40 && lum < 215) { r += R; g += G; b += B; n++; }
+        }
+        const [pr, pg, pb] = n > size ? [r / n, g / n, b / n] : [ra / na, ga / na, ba / na];
+        const color = `${Math.round(pr)}, ${Math.round(pg)}, ${Math.round(pb)}`;
+        _colorCache.set(url, color);
+        resolve(color);
+      } catch {
+        resolve(null);
+      }
+    };
+    img.onerror = () => resolve(null);
+    img.src = url;
+  });
+}
+
 export function platformLogoImg(platform, cls = '') {
   const src = getPlatformLogo(platform);
   if (!src) return `<span class="platform-text ${cls}">${platform || ''}</span>`;
