@@ -1,18 +1,35 @@
 import { mount as mountHome }    from './screens/home.js';
 import { mount as mountDetail }  from './screens/detail.js';
 import { mount as mountLibrary } from './screens/library.js';
+import { mount as mountStats }   from './screens/stats.js';
 import { API_HOST }              from './data/api.js';
 
-const SCREENS = { home: mountHome, detail: mountDetail, library: mountLibrary };
+const SCREENS = { home: mountHome, detail: mountDetail, library: mountLibrary, stats: mountStats };
 
 let currentCleanup = null;
+let currentScreen = null;
+
+// Header pages cycled with L1/R1. Library and detail are sub-screens of
+// Games and keep their own shoulder-button behavior.
+const TOP_PAGES = ['home', 'stats'];
 
 export function navigate(screen, params = {}) {
   if (currentCleanup) { currentCleanup(); currentCleanup = null; }
+  currentScreen = screen;
   const main = document.getElementById('main');
   currentCleanup = SCREENS[screen](main, navigate, params) ?? null;
   updateNav(screen);
   updateHints(screen);
+}
+
+function initPageSwitcher() {
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'L1' && e.key !== 'R1') return;
+    const idx = TOP_PAGES.indexOf(currentScreen);
+    if (idx === -1) return;
+    const dir = e.key === 'R1' ? 1 : -1;
+    navigate(TOP_PAGES[(idx + dir + TOP_PAGES.length) % TOP_PAGES.length]);
+  });
 }
 
 function updateNav(screen) {
@@ -25,7 +42,11 @@ const SCREEN_HINTS = {
   home: `
     <span class="hint"><span class="hint-btn">✕</span> Selecionar</span>
     <span class="hint"><span class="hint-btn">□</span> Library</span>
-    <span class="hint"><span class="hint-btn">↓</span> Stats</span>`,
+    <span class="hint"><span class="hint-btn hint-btn-wide">R1</span> Stats</span>`,
+  stats: `
+    <span class="hint"><span class="hint-btn">○</span> Voltar</span>
+    <span class="hint"><span class="hint-btn hint-btn-wide">L1</span> Games</span>
+    <span class="hint"><span class="hint-btn">↑</span><span class="hint-btn">↓</span> Abas</span>`,
   library: `
     <span class="hint"><span class="hint-btn">✕</span> Selecionar</span>
     <span class="hint"><span class="hint-btn">○</span> Voltar</span>
@@ -143,12 +164,6 @@ function init() {
     el.addEventListener('click', () => {
       const screen = el.dataset.screen;
       if (screen === 'settings') return;
-      if (screen === 'stats') {
-        const section = document.getElementById('section-stats');
-        if (section) { section.scrollIntoView({ behavior: 'smooth' }); }
-        else { navigate('home', { scrollToStats: true }); }
-        return;
-      }
       navigate(screen);
     });
   });
@@ -156,6 +171,7 @@ function init() {
   updateClock();
   setInterval(updateClock, 1000);
   initGamepad();
+  initPageSwitcher();
   navigate('home');
 }
 
