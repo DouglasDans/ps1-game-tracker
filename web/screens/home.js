@@ -1,5 +1,5 @@
 import { fetchGames, fetchActiveSession } from '../data/api.js';
-import { fmtTime, fmtDateShort, fmtSource, cardGradient, platformLogoImg, extractDominantColor } from '../utils.js';
+import { fmtTime, fmtDateShort, fmtSource, cardGradient, hueGradient, hueOf, platformLogoImg, extractDominantColor } from '../utils.js';
 
 const CARD_W         = 130;
 const CARD_GAP       = 14;
@@ -148,6 +148,12 @@ function buildHTML(items, selectedIndex, active) {
 
 let _backdropToken = 0;
 
+function setBackdropGradient(el, baseGradient) {
+  el.style.background =
+    `linear-gradient(180deg, rgba(13, 13, 26, 0.55) 0%, rgba(13, 13, 26, 0.85) 55%, var(--bg) 85%), ${baseGradient}`;
+  el.classList.add('visible');
+}
+
 function updateBackdrop(item) {
   const el = document.getElementById('home-backdrop');
   if (!el) return;
@@ -158,16 +164,12 @@ function updateBackdrop(item) {
     return;
   }
   if (!item.cover_url) {
-    el.style.background =
-      `linear-gradient(180deg, rgba(13, 13, 26, 0.55) 0%, rgba(13, 13, 26, 0.85) 55%, var(--bg) 85%), ${cardGradient(item.display_name)}`;
-    el.classList.add('visible');
+    setBackdropGradient(el, cardGradient(item.display_name));
     return;
   }
   extractDominantColor(item.cover_url).then(c => {
     if (!c || token !== _backdropToken || !el.isConnected) return;
-    el.style.background =
-      `linear-gradient(70deg, rgba(${c}, 0.5) 0%, rgba(${c}, 0.16) 45%, transparent 75%)`;
-    el.classList.add('visible');
+    setBackdropGradient(el, hueGradient(hueOf(c)));
   });
 }
 

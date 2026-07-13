@@ -54,11 +54,26 @@ export function fmtSource(src) {
   return SOURCE_LABEL[src] || src || '—';
 }
 
+export function hueGradient(hue) {
+  return `linear-gradient(145deg, hsl(${hue},65%,38%), hsl(${(hue + 50) % 360},55%,18%))`;
+}
+
 export function cardGradient(name) {
   let h = 0;
   for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
-  const hue = h % 360;
-  return `linear-gradient(145deg, hsl(${hue},65%,38%), hsl(${(hue + 50) % 360},55%,18%))`;
+  return hueGradient(h % 360);
+}
+
+// Hue (0-360) of an "r, g, b" string produced by extractDominantColor.
+export function hueOf(c) {
+  const [r, g, b] = c.split(',').map(v => Number(v) / 255);
+  const max = Math.max(r, g, b), min = Math.min(r, g, b), d = max - min;
+  if (!d) return 0;
+  let h;
+  if (max === r) h = ((g - b) / d) % 6;
+  else if (max === g) h = (b - r) / d + 2;
+  else h = (r - g) / d + 4;
+  return Math.round((h * 60 + 360) % 360);
 }
 
 const _colorCache = new Map();
