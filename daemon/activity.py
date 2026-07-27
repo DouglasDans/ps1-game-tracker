@@ -40,10 +40,15 @@ def compute_streaks(days: set[date], today: date) -> tuple[int, int]:
     return current, longest
 
 
+HEATMAP_DAYS = 91
+
+
 def compute_activity_patterns(sessions: list[dict], today: date | None = None) -> dict:
     by_weekday = [0] * 7
     by_hour = [0] * 24
+    by_day: dict[date, int] = {}
     days_played: set[date] = set()
+    today = today or datetime.now(LOCAL_TZ).date()
 
     for s in sessions:
         started_at = s.get("started_at")
@@ -51,17 +56,29 @@ def compute_activity_patterns(sessions: list[dict], today: date | None = None) -
             continue
         duration = s.get("duration_s") or 0
         local_dt = _to_local(started_at)
+        local_date = local_dt.date()
         by_weekday[local_dt.weekday()] += duration
         by_hour[local_dt.hour] += duration
-        days_played.add(local_dt.date())
+        days_played.add(local_date)
+        by_day[local_date] = by_day.get(local_date, 0) + duration
 
-    current, longest = compute_streaks(days_played, today or datetime.now(LOCAL_TZ).date())
+    current, longest = compute_streaks(days_played, today)
+
+    window_start = today - timedelta(days=HEATMAP_DAYS - 1)
+    heatmap = [
+        {
+            "date": (window_start + timedelta(days=i)).isoformat(),
+            "total_seconds": by_day.get(window_start + timedelta(days=i), 0),
+        }
+        for i in range(HEATMAP_DAYS)
+    ]
 
     return {
         "by_weekday": [
             {"day": WEEKDAY_LABELS[i], "total_seconds": by_weekday[i]} for i in range(7)
         ],
         "by_hour": [{"hour": h, "total_seconds": by_hour[h]} for h in range(24)],
+        "by_day": heatmap,
         "current_streak": current,
         "longest_streak": longest,
     }

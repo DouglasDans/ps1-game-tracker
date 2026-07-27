@@ -31,7 +31,7 @@ def _row(conn, file_path: str) -> dict:
         conn.execute(
             "SELECT id, file_path, display_name, platform, canonical_name, "
             "enriched_at, enrichment_retries, cover_url, igdb_id, release_year, genre, "
-            "summary, developer, game_modes "
+            "summary, developer, publisher, game_modes "
             "FROM games WHERE file_path = ?",
             (file_path,),
         ).fetchone()
@@ -51,6 +51,7 @@ def test_enrich_game_igdb_success(conn):
              "igdb_id": 375,
              "summary": "A stealth game about Solid Snake infiltrating Shadow Moses Island.",
              "developer": "Konami",
+             "publisher": "Konami Digital Entertainment",
              "game_modes": "Single player",
          }):
         result = enrich_game(conn, game, IGDB_CONFIG)
@@ -65,6 +66,7 @@ def test_enrich_game_igdb_success(conn):
     assert row["genre"] == "Shooter, Tactical"
     assert row["summary"] == "A stealth game about Solid Snake infiltrating Shadow Moses Island."
     assert row["developer"] == "Konami"
+    assert row["publisher"] == "Konami Digital Entertainment"
     assert row["game_modes"] == "Single player"
 
 
@@ -136,6 +138,7 @@ def test_igdb_search_includes_platform_filter():
     assert result["release_year"] == 1998
     assert result["summary"] == "A stealth game about Solid Snake infiltrating Shadow Moses Island."
     assert result["developer"] == "Konami"
+    assert result["publisher"] == "Konami Digital Entertainment"
     assert result["game_modes"] == "Single player"
 
 
@@ -157,6 +160,46 @@ def test_igdb_search_joins_multiple_developers():
         result = _igdb_search("Co-Dev Game", "PS1", "tok", "cid")
 
     assert result["developer"] == "Studio A, Studio B"
+    assert result["publisher"] == "Publisher Only"
+
+
+def test_igdb_search_developer_and_publisher_can_be_the_same_company():
+    # Self-published title: one company flagged as both developer and publisher.
+    response = [{
+        "id": 2,
+        "name": "Self Published Game",
+        "involved_companies": [
+            {"company": {"name": "Indie Co"}, "developer": True, "publisher": True},
+        ],
+    }]
+    mock_resp = MagicMock()
+    mock_resp.json.return_value = response
+    mock_resp.raise_for_status = MagicMock()
+
+    with patch("daemon.enricher.requests.post", return_value=mock_resp):
+        result = _igdb_search("Self Published Game", "PS1", "tok", "cid")
+
+    assert result["developer"] == "Indie Co"
+    assert result["publisher"] == "Indie Co"
+
+
+def test_igdb_search_publisher_none_when_no_publisher_credited():
+    # Indie/homebrew title with no publisher entry at all.
+    response = [{
+        "id": 3,
+        "name": "Homebrew Game",
+        "involved_companies": [
+            {"company": {"name": "Solo Dev"}, "developer": True, "publisher": False},
+        ],
+    }]
+    mock_resp = MagicMock()
+    mock_resp.json.return_value = response
+    mock_resp.raise_for_status = MagicMock()
+
+    with patch("daemon.enricher.requests.post", return_value=mock_resp):
+        result = _igdb_search("Homebrew Game", "PS1", "tok", "cid")
+
+    assert result["publisher"] is None
 
 
 def test_igdb_search_omits_platform_filter_for_unknown_platform():
@@ -213,4 +256,5 @@ def test_igdb_search_handles_missing_cover():
     assert result["release_year"] is None
     assert result["summary"] is None
     assert result["developer"] is None
+    assert result["publisher"] is None
     assert result["game_modes"] is None

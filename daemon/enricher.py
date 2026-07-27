@@ -121,7 +121,8 @@ def _igdb_search(
 
     query = (
         f'search "{canonical_name}"; fields name,genres.name,cover.image_id,first_release_date,'
-        "summary,involved_companies.company.name,involved_companies.developer,game_modes.name; "
+        "summary,involved_companies.company.name,involved_companies.developer,"
+        "involved_companies.publisher,game_modes.name; "
     )
     if platform_id:
         query += f"where platforms = ({platform_id}); "
@@ -157,13 +158,21 @@ def _igdb_search(
         release_year = datetime.fromtimestamp(game["first_release_date"]).year
 
     developer = None
+    publisher = None
     if "involved_companies" in game:
-        names = [
+        dev_names = [
             ic["company"]["name"]
             for ic in game["involved_companies"]
             if ic.get("developer") and "company" in ic
         ]
-        developer = ", ".join(names) if names else None
+        developer = ", ".join(dev_names) if dev_names else None
+
+        pub_names = [
+            ic["company"]["name"]
+            for ic in game["involved_companies"]
+            if ic.get("publisher") and "company" in ic
+        ]
+        publisher = ", ".join(pub_names) if pub_names else None
 
     game_modes = None
     if "game_modes" in game:
@@ -177,6 +186,7 @@ def _igdb_search(
         "igdb_id": game["id"],
         "summary": game.get("summary"),
         "developer": developer,
+        "publisher": publisher,
         "game_modes": game_modes,
     }
 

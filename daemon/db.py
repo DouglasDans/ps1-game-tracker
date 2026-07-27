@@ -41,6 +41,7 @@ def init_db(conn: sqlite3.Connection) -> None:
         ("summary", "TEXT"),
         ("developer", "TEXT"),
         ("game_modes", "TEXT"),
+        ("publisher", "TEXT"),
     ]:
         try:
             conn.execute(f"ALTER TABLE games ADD COLUMN {col} {typedef}")
@@ -60,8 +61,10 @@ def init_db(conn: sqlite3.Connection) -> None:
             MIN(g.release_year)                                                AS release_year,
             MIN(g.developer)                                                   AS developer,
             MIN(g.game_modes)                                                  AS game_modes,
+            MIN(g.summary)                                                     AS summary,
             COUNT(s.id)                                                        AS session_count,
             SUM(s.duration_s)                                                  AS total_seconds,
+            COUNT(DISTINCT DATE(s.started_at))                                 AS days_played,
             MAX(s.started_at)                                                  AS last_played,
             (
                 SELECT s2.source
@@ -226,6 +229,7 @@ def update_game_enrichment(
     screenscraper_id: int | None = None,
     summary: str | None = None,
     developer: str | None = None,
+    publisher: str | None = None,
     game_modes: str | None = None,
 ) -> None:
     conn.execute(
@@ -239,12 +243,13 @@ def update_game_enrichment(
             screenscraper_id = COALESCE(?, screenscraper_id),
             summary          = COALESCE(?, summary),
             developer        = COALESCE(?, developer),
+            publisher        = COALESCE(?, publisher),
             game_modes       = COALESCE(?, game_modes),
             enriched_at      = datetime('now')
         WHERE id = ?
         """,
         (display_name, cover_url, genre, release_year, igdb_id, screenscraper_id,
-         summary, developer, game_modes, game_id),
+         summary, developer, publisher, game_modes, game_id),
     )
     conn.commit()
 
@@ -260,7 +265,7 @@ def increment_enrichment_retries(conn: sqlite3.Connection, game_id: int) -> None
 def get_game_detail(conn: sqlite3.Connection, game_id: int) -> dict | None:
     game = conn.execute(
         "SELECT id, file_path, display_name, platform, cover_url, genre, release_year, igdb_id, canonical_name, "
-        "summary, developer, game_modes "
+        "summary, developer, publisher, game_modes "
         "FROM games WHERE id = ?",
         (game_id,),
     ).fetchone()
@@ -340,6 +345,7 @@ def get_game_detail(conn: sqlite3.Connection, game_id: int) -> dict | None:
         "igdb_id": game["igdb_id"],
         "summary": game["summary"],
         "developer": game["developer"],
+        "publisher": game["publisher"],
         "game_modes": game["game_modes"],
         "total_seconds": summary["total_seconds"],
         "session_count": summary["session_count"],
@@ -358,7 +364,9 @@ def get_stats_summary(conn: sqlite3.Connection) -> dict:
     totals = conn.execute(
         """
         SELECT COALESCE(SUM(s.duration_s), 0) AS total_seconds,
-               COUNT(DISTINCT COALESCE(g.canonical_name, g.file_path) || '|' || COALESCE(g.platform, '')) AS total_games
+               COUNT(DISTINCT COALESCE(g.canonical_name, g.file_path) || '|' || COALESCE(g.platform, '')) AS total_games,
+               COUNT(s.id) AS total_sessions,
+               COUNT(DISTINCT DATE(s.started_at)) AS total_days_played
         FROM sessions s
         JOIN games g ON g.id = s.game_id
         WHERE s.ended_at IS NOT NULL
@@ -409,6 +417,8 @@ def get_stats_summary(conn: sqlite3.Connection) -> dict:
     return {
         "total_seconds": total_secs,
         "total_games": totals["total_games"],
+        "total_sessions": totals["total_sessions"],
+        "total_days_played": totals["total_days_played"],
         "most_played": dict(most_played) if most_played else None,
         "longest_session": dict(longest) if longest else None,
         "by_platform": [
@@ -450,7 +460,7 @@ def get_recent_sessions(conn: sqlite3.Connection, limit: int = 20) -> list[dict]
 def get_games(conn: sqlite3.Connection) -> list[dict]:
     rows = conn.execute(
         "SELECT id, file_path, display_name, platform, cover_url, genre, release_year, "
-        "developer, game_modes, "
-        "session_count, total_seconds, last_played, last_source FROM playtime_summary"
+        "developer, game_modes, summary, "
+        "session_count, total_seconds, days_played, last_played, last_source FROM playtime_summary"
     ).fetchall()
     return [dict(r) for r in rows]

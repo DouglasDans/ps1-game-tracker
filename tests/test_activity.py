@@ -61,6 +61,36 @@ def test_compute_activity_patterns_skips_sessions_without_started_at():
     assert sum(h["total_seconds"] for h in result["by_hour"]) == 0
 
 
+def test_compute_activity_patterns_by_day_covers_last_91_days_ending_today():
+    result = compute_activity_patterns([], today=date(2026, 7, 10))
+
+    assert len(result["by_day"]) == 91
+    assert result["by_day"][0]["date"] == "2026-04-11"
+    assert result["by_day"][-1]["date"] == "2026-07-10"
+    assert all(d["total_seconds"] == 0 for d in result["by_day"])
+
+
+def test_compute_activity_patterns_by_day_sums_sessions_on_same_local_day():
+    sessions = [
+        _session("2026-07-09 22:00:00", 300),  # 2026-07-09 19:00 local
+        _session("2026-07-09 22:30:00", 200),  # same local day
+    ]
+
+    result = compute_activity_patterns(sessions, today=date(2026, 7, 10))
+
+    by_day = {d["date"]: d["total_seconds"] for d in result["by_day"]}
+    assert by_day["2026-07-09"] == 500
+
+
+def test_compute_activity_patterns_by_day_excludes_days_outside_window():
+    # More than 91 days before "today" — must not appear in by_day.
+    sessions = [_session("2026-01-01 12:00:00", 500)]
+
+    result = compute_activity_patterns(sessions, today=date(2026, 7, 10))
+
+    assert sum(d["total_seconds"] for d in result["by_day"]) == 0
+
+
 # --- compute_streaks ---
 
 def test_compute_streaks_empty():

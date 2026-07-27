@@ -183,6 +183,48 @@ def test_get_games_includes_developer_and_game_modes(conn):
     assert games[0]["game_modes"] == "Single player"
 
 
+def test_get_games_includes_summary(conn):
+    game_id = upsert_game(conn, "/roms/mgs.cue", "MGS", "PS1", "MGS")
+    conn.execute(
+        "UPDATE games SET summary = ? WHERE id = ?",
+        ("A stealth game about Solid Snake.", game_id),
+    )
+    session_id = open_session(conn, game_id, "duckstation")
+    close_session(conn, session_id)
+    conn.commit()
+
+    games = get_games(conn)
+    assert games[0]["summary"] == "A stealth game about Solid Snake."
+
+
+def test_get_games_includes_days_played(conn):
+    game_id = upsert_game(conn, "/roms/mgs.cue", "MGS", "PS1", "MGS")
+
+    s1 = open_session(conn, game_id, "duckstation")
+    close_session(conn, s1)
+    conn.execute(
+        "UPDATE sessions SET started_at = '2026-01-10 10:00:00', duration_s = 100 WHERE id = ?",
+        (s1,),
+    )
+    s2 = open_session(conn, game_id, "duckstation")
+    close_session(conn, s2)
+    conn.execute(
+        "UPDATE sessions SET started_at = '2026-01-10 20:00:00', duration_s = 100 WHERE id = ?",
+        (s2,),
+    )
+    s3 = open_session(conn, game_id, "duckstation")
+    close_session(conn, s3)
+    conn.execute(
+        "UPDATE sessions SET started_at = '2026-01-11 10:00:00', duration_s = 100 WHERE id = ?",
+        (s3,),
+    )
+    conn.commit()
+
+    games = get_games(conn)
+    # Two sessions on 01-10 count as a single day; plus 01-11 = 2 distinct days.
+    assert games[0]["days_played"] == 2
+
+
 def test_get_games_aggregates_multi_track_playtime(conn):
     id1 = upsert_game(conn, "/roms/Dino Crisis (Track 1).bin", "Dino Crisis", "PS1", "Dino Crisis")
     id2 = upsert_game(conn, "/roms/Dino Crisis (Track 2).bin", "Dino Crisis", "PS1", "Dino Crisis")
@@ -291,6 +333,21 @@ def test_update_game_enrichment_does_not_overwrite_summary_developer_game_modes_
     assert row["game_modes"] == "Single player"
 
 
+def test_update_game_enrichment_sets_publisher(conn):
+    game_id = upsert_game(conn, "/roms/mgs.chd")
+    update_game_enrichment(conn, game_id, publisher="Konami Digital Entertainment")
+    row = conn.execute("SELECT publisher FROM games WHERE id = ?", (game_id,)).fetchone()
+    assert row["publisher"] == "Konami Digital Entertainment"
+
+
+def test_update_game_enrichment_does_not_overwrite_publisher_with_none(conn):
+    game_id = upsert_game(conn, "/roms/mgs.chd")
+    update_game_enrichment(conn, game_id, publisher="Old Publisher")
+    update_game_enrichment(conn, game_id, publisher=None)
+    row = conn.execute("SELECT publisher FROM games WHERE id = ?", (game_id,)).fetchone()
+    assert row["publisher"] == "Old Publisher"
+
+
 def test_increment_enrichment_retries(conn):
     game_id = upsert_game(conn, "/roms/mgs.chd")
     increment_enrichment_retries(conn, game_id)
@@ -341,6 +398,14 @@ def test_get_game_detail_includes_summary_developer_game_modes(conn):
     assert result["summary"] == "A stealth game about Solid Snake."
     assert result["developer"] == "Konami"
     assert result["game_modes"] == "Single player"
+
+
+def test_get_game_detail_includes_publisher(conn):
+    game_id = upsert_game(conn, "/roms/mgs.chd", "Metal Gear Solid", "PS1", "Metal Gear Solid")
+    update_game_enrichment(conn, game_id, publisher="Konami Digital Entertainment")
+
+    result = get_game_detail(conn, game_id)
+    assert result["publisher"] == "Konami Digital Entertainment"
 
 
 def test_get_game_detail_excludes_open_sessions(conn):
@@ -519,6 +584,8 @@ def test_get_stats_summary_empty_db(conn):
     result = get_stats_summary(conn)
     assert result["total_seconds"] == 0
     assert result["total_games"] == 0
+    assert result["total_sessions"] == 0
+    assert result["total_days_played"] == 0
     assert result["most_played"] is None
     assert result["longest_session"] is None
     assert result["by_platform"] == []
@@ -589,6 +656,44 @@ def test_get_stats_summary_longest_session(conn):
     result = get_stats_summary(conn)
     assert result["longest_session"]["duration_s"] == 9000
     assert result["longest_session"]["display_name"] == "Crash Team Racing"
+
+
+def test_get_stats_summary_total_sessions(conn):
+    id1 = upsert_game(conn, "/roms/mgs.chd", "MGS", "PS1", "MGS")
+    id2 = upsert_game(conn, "/roms/ctr.chd", "CTR", "PS1", "CTR")
+
+    s1 = open_session(conn, id1, "duckstation")
+    close_session(conn, s1)
+    s2 = open_session(conn, id2, "duckstation")
+    close_session(conn, s2)
+    s3 = open_session(conn, id2, "duckstation")
+    close_session(conn, s3)
+    open_session(conn, id1, "duckstation")  # still open, must not count
+
+    result = get_stats_summary(conn)
+    assert result["total_sessions"] == 3
+
+
+def test_get_stats_summary_total_days_played_counts_distinct_days_across_games(conn):
+    id1 = upsert_game(conn, "/roms/mgs.chd", "MGS", "PS1", "MGS")
+    id2 = upsert_game(conn, "/roms/ctr.chd", "CTR", "PS1", "CTR")
+
+    s1 = open_session(conn, id1, "duckstation")
+    close_session(conn, s1)
+    conn.execute("UPDATE sessions SET started_at = '2026-01-10 10:00:00' WHERE id = ?", (s1,))
+
+    # Same day, different game — should not double count the day.
+    s2 = open_session(conn, id2, "duckstation")
+    close_session(conn, s2)
+    conn.execute("UPDATE sessions SET started_at = '2026-01-10 20:00:00' WHERE id = ?", (s2,))
+
+    s3 = open_session(conn, id1, "duckstation")
+    close_session(conn, s3)
+    conn.execute("UPDATE sessions SET started_at = '2026-01-11 10:00:00' WHERE id = ?", (s3,))
+    conn.commit()
+
+    result = get_stats_summary(conn)
+    assert result["total_days_played"] == 2
 
 
 def test_get_stats_summary_by_platform(conn):
