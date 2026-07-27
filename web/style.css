@@ -12,6 +12,7 @@
   --bg-card: #1a1a2e;
   --accent: #0070d1;
   --accent-glow: rgba(0, 112, 209, 0.3);
+  --neutral-fill: #4a4a68;
   --text: #f0f0f8;
   --text-dim: #b8b8d4;
   --text-muted: #9090b8;
@@ -291,9 +292,13 @@ body {
 
 .wd-bar {
   width: 70%;
-  background: var(--accent);
+  background: var(--neutral-fill);
   border-radius: 5px 5px 0 0;
   min-height: 2px;
+}
+
+.wd-col.peak .wd-bar {
+  background: var(--accent);
 }
 
 .wd-label {
@@ -936,7 +941,7 @@ body {
 
 .session-bar-fill {
   height: 100%;
-  background: var(--accent);
+  background: var(--neutral-fill);
   border-radius: 4px;
 }
 
@@ -1182,7 +1187,7 @@ body {
 
 .platform-bar-fill {
   height: 100%;
-  background: var(--accent);
+  background: var(--neutral-fill);
   border-radius: 3px;
   transition: width 0.7s ease;
 }
