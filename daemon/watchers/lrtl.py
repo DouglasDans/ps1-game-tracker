@@ -9,6 +9,12 @@ from daemon.session_manager import normalize_game_name
 
 logger = logging.getLogger(__name__)
 
+# RetroArch core names (= subfolder under playlists/logs/) that emulate PS1.
+# DuckStation is the tracked source for PS1 — these cores are blacklisted entirely,
+# regardless of what platform a same-named title resolves to in another core's playlist
+# (e.g. a game released on both PS1 and Dreamcast would otherwise collide on title alone).
+_PS1_CORES = {"PCSX-ReARMed", "Beetle PSX HW", "SwanStation"}
+
 _PLATFORM_MAP = {
     # Sony
     "Sony - PlayStation": "PS1",
@@ -150,10 +156,11 @@ def _import_file(conn: sqlite3.Connection, lrtl_path: Path, playlist_map: dict[s
     if not parsed:
         return 0
 
+    if lrtl_path.parent.name in _PS1_CORES:
+        return 0
+
     content_name = normalize_game_name(lrtl_path.stem)
     platform = playlist_map.get(content_name.lower()) or None
-    if platform == "PS1":
-        return 0
 
     runtime_s, last_played = parsed
     delta_s = runtime_s - _known_runtime_s(conn, content_name)

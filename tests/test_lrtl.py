@@ -192,16 +192,61 @@ def test_import_sessions_sets_platform_from_playlist(conn, tmp_path):
     assert row["platform"] == "Mega Drive"
 
 
-def test_import_sessions_skips_ps1_platform(conn, tmp_path):
-    logs_dir = tmp_path / "logs"
-    logs_dir.mkdir()
+def test_import_sessions_skips_pcsx_rearmed_core(conn, tmp_path):
+    logs_dir = tmp_path / "logs" / "PCSX-ReARMed"
+    logs_dir.mkdir(parents=True)
     (logs_dir / "Ico.lrtl").write_text(json.dumps(_LRTL))
-    _write_playlist(tmp_path, [_ps1_item("Ico")])
 
     n = import_sessions(conn, [str(tmp_path)])
 
     assert n == 0
     assert conn.execute("SELECT COUNT(*) FROM sessions").fetchone()[0] == 0
+    assert conn.execute("SELECT COUNT(*) FROM games").fetchone()[0] == 0
+
+
+def test_import_sessions_skips_beetle_psx_hw_core(conn, tmp_path):
+    logs_dir = tmp_path / "logs" / "Beetle PSX HW"
+    logs_dir.mkdir(parents=True)
+    (logs_dir / "Ico.lrtl").write_text(json.dumps(_LRTL))
+
+    n = import_sessions(conn, [str(tmp_path)])
+
+    assert n == 0
+    assert conn.execute("SELECT COUNT(*) FROM games").fetchone()[0] == 0
+
+
+def test_import_sessions_skips_swanstation_core(conn, tmp_path):
+    logs_dir = tmp_path / "logs" / "SwanStation"
+    logs_dir.mkdir(parents=True)
+    (logs_dir / "Ico.lrtl").write_text(json.dumps(_LRTL))
+
+    n = import_sessions(conn, [str(tmp_path)])
+
+    assert n == 0
+    assert conn.execute("SELECT COUNT(*) FROM games").fetchone()[0] == 0
+
+
+def test_import_sessions_imports_non_ps1_core_normally(conn, tmp_path):
+    logs_dir = tmp_path / "logs" / "Flycast"
+    logs_dir.mkdir(parents=True)
+    (logs_dir / "Shenmue.lrtl").write_text(json.dumps(_LRTL))
+
+    n = import_sessions(conn, [str(tmp_path)])
+
+    assert n == 1
+    assert conn.execute("SELECT COUNT(*) FROM games").fetchone()[0] == 1
+
+
+def test_import_sessions_ps1_core_skip_does_not_depend_on_playlist(conn, tmp_path):
+    # Same title also listed under a non-PS1 playlist (name collision) — core folder wins.
+    logs_dir = tmp_path / "logs" / "PCSX-ReARMed"
+    logs_dir.mkdir(parents=True)
+    (logs_dir / "Dino Crisis.lrtl").write_text(json.dumps(_LRTL))
+    _write_playlist(tmp_path, [_megadrive_item("Dino Crisis")], filename="Sega - Mega Drive - Genesis.lpl")
+
+    n = import_sessions(conn, [str(tmp_path)])
+
+    assert n == 0
     assert conn.execute("SELECT COUNT(*) FROM games").fetchone()[0] == 0
 
 
