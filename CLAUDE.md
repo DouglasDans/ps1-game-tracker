@@ -144,6 +144,9 @@ ps1-game-tracker/
 │ summary               TEXT  ← sinopse (IGDB)             │
 │ developer             TEXT  ← involved_companies onde     │
 │                                   developer=true, joined  │
+│ publisher             TEXT  ← involved_companies onde     │
+│                                   publisher=true, joined  │
+│                                   (pode repetir developer) │
 │ game_modes            TEXT  ← ex: "Single player,        │
 │                                   Multiplayer"            │
 │ enriched_at           DATETIME                          │
@@ -175,7 +178,9 @@ ps1-game-tracker/
 VIEW playtime_summary
   Agrega sessions por canonical_name (ou file_path).
   Expõe: id, file_path, display_name, platform, cover_url,
-         session_count, total_seconds, last_played.
+         genre, release_year, developer, game_modes, summary,
+         session_count, total_seconds, days_played, last_played,
+         last_source.
   Usada pelo endpoint GET /games.
 ```
 
@@ -321,5 +326,7 @@ Confirmado em produção com DuckStation AppImage + PPSSPP:
 **Redesign TV das Stats (2026-07-12):** dia da semana virou gráfico de colunas verticais (skyline) com pico destacado por peso tipográfico (não por cor — cor segue a entidade, não o rank); novo bloco "Período do dia" com 4 cards (madrugada/manhã/tarde/noite) agregando o `by_hour` de `/stats/activity` que o front não usava. `aggregateBy` em `home.js` agora recebe keyFn que retorna array de tokens: campos IGDB compostos (`genre`, `developer`, `game_modes` — strings joined por vírgula) são divididos via `splitField` e cada token credita o tempo do jogo — antes "Racing, Simulator" e 4 variações de "Single player, Multi…" apareciam como categorias distintas. Largura das barras normalizada pelo maior item (não pelo total). Insights do detail em cards (mesmo visual das linhas de sessão).
 
 **Metadados IGDB ampliados (2026-07-10):** `enricher.py` passa a pedir `summary`, `involved_companies.company.name`/`.developer` e `game_modes.name` do IGDB (antes só `name,genres.name,cover.image_id,first_release_date`). `involved_companies` é filtrado por `developer == True` antes de juntar os nomes — evita creditar a publisher como desenvolvedora. Campos novos (`summary`, `developer`, `game_modes`) expostos em `/games` e `/games/{id}`; detail page ganha seção "Sinopse" e developer/game_modes na linha de meta; Stats ganha barras "por desenvolvedora" e "por modo de jogo". **Jogos já enriquecidos no Pi não recebem os campos novos automaticamente** — rodar `POST /admin/reset-enrichment` uma vez após o deploy pra reprocessar a biblioteca.
+
+**Redesign TV — import Turno 4/5 do Claude Design, backend (2026-07-27):** importado documento de exploração do claude.ai/design ("Interface de TV para PS1 Pro") com o próximo redesign de Home/Detail/Library/Stats — implementação em fases na branch `design/home-tv-turno4`. Fase 1 (backend): `enricher.py` passa a extrair também `involved_companies.publisher` (mesmo padrão do `developer`, tolerando lista vazia — indie/homebrew não tem publisher creditado; uma company pode ser developer E publisher ao mesmo tempo em título autopublicado). `publisher` novo campo em `games`. `playtime_summary` ganha `days_played` (`COUNT(DISTINCT DATE(started_at))`) e `summary` — o carrossel da Home precisa dessas infos por jogo sem round-trip extra por seleção (TV precisa responder instantâneo a ← →). `get_stats_summary` ganha `total_sessions` e `total_days_played` (dias distintos com qualquer sessão, **não** é a soma de `days_played` por jogo — um dia com sessão em 2 jogos diferentes conta 1 vez no total global). `compute_activity_patterns` (`daemon/activity.py`) ganha `by_day`: lista dos últimos 91 dias (janela fixa terminando hoje, fuso America/Sao_Paulo) com total de segundos por dia — alimenta o heatmap de atividade tipo GitHub contribution graph que entra no Stats global e no Detail por jogo. Próximas fases (frontend): chrome global com nav em pílula + ícones (vendorizados localmente, sem CDN — offline-first como o resto do projeto), Home, Detail (aba Estatísticas por jogo substitui Sessões), Library e Stats globais redesenhados.
 
 **Fase 3 concluída (2026-05-30):** `daemon/enricher.py` — IGDB como único enricher (ScreenScraper descartado). `enrich_game` busca por `canonical_name` + filtro de platform (PS1=7, PS2=8, PSP=38); plataformas não mapeadas buscam sem filtro. Thread de background com fila (`enricher_loop`): seeded no startup com todos os jogos `enriched_at IS NULL`, e enfileira novos jogos detectados pelo polling loop. Throttle de 0.3s entre requests para respeitar 4 req/s do IGDB. `RateLimitError` (429): não incrementa `enrichment_retries` — game re-enfileirado após sleep de 10s. Desiste após 3 boots com falha (`enrichment_retries >= 3`). Token Twitch cacheado em `igdb_token.json` ao lado do DB (~62 dias). Schema: campo `enrichment_retries INTEGER DEFAULT 0` adicionado via `ALTER TABLE`. Configurar no Pi: adicionar `[igdb]` com `client_id` e `client_secret` ao `config.toml`.
