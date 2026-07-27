@@ -1,11 +1,14 @@
 import { fetchGameDetail } from '../data/api.js';
-import { fmtTime, fmtDate, fmtDateShort, fmtSource, cardGradient, getPlatformLogo, extractDominantColor, localDateKey } from '../utils.js';
+import { fmtTime, fmtDate, fmtDateShort, fmtSource, cardGradient, getPlatformLogo, extractDominantColor, localDateKey, localHour, localWeekdayMon0, hueOf, hueOfName } from '../utils.js';
 
 const SCROLL_STEP = 240;
+const HEATMAP_DAYS = 91;
+const MONTH_LABELS = ['JAN', 'FEV', 'MAR', 'ABR', 'MAI', 'JUN', 'JUL', 'AGO', 'SET', 'OUT', 'NOV', 'DEZ'];
+const WEEKDAY_LABELS = ['SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB', 'DOM'];
 
 const TABS = [
   { key: 'overview', label: 'Visão geral' },
-  { key: 'sessions', label: 'Sessões' },
+  { key: 'stats', label: 'Estatísticas' },
   { key: 'achievements', label: 'Conquistas' },
 ];
 
@@ -28,7 +31,7 @@ export function mount(container, navigate, params = {}) {
 
       const content = {
         overview: buildOverviewTab(detail),
-        sessions: buildSessionsTab(detail),
+        stats: buildStatsTab(detail),
         achievements: buildAchievementsTab(),
       };
 
@@ -100,6 +103,7 @@ function applyBackdrop(container, d) {
     el.style.background =
       `linear-gradient(180deg, rgba(13, 13, 26, 0.5) 0%, rgba(13, 13, 26, 0.8) 45%, var(--bg) 80%), ${cardGradient(d.display_name)}`;
     el.classList.add('visible');
+    container.querySelector('.screen-detail')?.style.setProperty('--accent-game', `hsl(${hueOfName(d.display_name)}, 70%, 66%)`);
     return;
   }
   extractDominantColor(d.cover_url).then(c => {
@@ -107,6 +111,7 @@ function applyBackdrop(container, d) {
     el.style.background =
       `linear-gradient(170deg, rgba(${c}, 0.55) 0%, rgba(${c}, 0.18) 45%, transparent 75%)`;
     el.classList.add('visible');
+    container.querySelector('.screen-detail')?.style.setProperty('--accent-game', `hsl(${hueOf(c)}, 70%, 66%)`);
   });
 }
 
@@ -176,6 +181,17 @@ function buildHTML(d, tabContent, tabIndex) {
 }
 
 function buildOverviewTab(d) {
+  const meta = [
+    { label: 'Desenvolvedora', value: d.developer || '—' },
+    { label: 'Publicadora', value: d.publisher || '—' },
+    { label: 'Lançamento', value: d.release_year || '—' },
+    { label: 'Modos', value: d.game_modes || '—' },
+  ].map(m => `
+    <div class="insight-card">
+      <div class="insight-card-label">${m.label}</div>
+      <div class="insight-card-value">${m.value}</div>
+    </div>`).join('');
+
   const insights = [
     { label: 'Média por sessão', value: fmtTime(d.avg_session_s ? Math.round(d.avg_session_s) : null) },
     { label: 'Sessão mais longa', value: fmtTime(d.longest_session_s), sub: d.longest_session_date ? fmtDayDate(d.longest_session_date) : null },
@@ -191,31 +207,190 @@ function buildOverviewTab(d) {
 
   return `
     <div class="stat-panel">
-      <div class="section-header">Estatísticas</div>
-      <div class="insight-cards">${insights}</div>
+      <div class="insight-cards">${meta}</div>
     </div>
     ${d.summary ? `<div class="stat-panel">
       <div class="section-header">Sinopse</div>
       <p class="detail-summary">${d.summary}</p>
-    </div>` : ''}`;
+    </div>` : ''}
+    <div class="stat-panel">
+      <div class="section-header">Estatísticas</div>
+      <div class="insight-cards">${insights}</div>
+    </div>`;
 }
 
-function buildSessionsTab(d) {
-  const maxDur = Math.max(...d.sessions.map(s => s.duration_s || 0), 1);
-  const rows = d.sessions.map(s => `
-    <div class="session-row">
-      <span class="session-date">${fmtDate(s.started_at)}</span>
-      <div class="session-bar">
-        <div class="session-bar-fill" style="width:${Math.max(3, Math.round(((s.duration_s || 0) / maxDur) * 100))}%"></div>
-      </div>
-      <span class="session-dur">${fmtTime(s.duration_s)}</span>
-      <span class="session-src">${fmtSource(s.source)}</span>
+function dayKey(date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+function toLocalDate(iso) {
+  return new Date(iso.includes('Z') ? iso : iso + 'Z');
+}
+
+function computeMonths(sessions, year) {
+  const totals = Array(12).fill(0);
+  for (const s of sessions) {
+    if (!s.started_at || !s.duration_s) continue;
+    const dt = toLocalDate(s.started_at);
+    if (dt.getFullYear() !== year) continue;
+    totals[dt.getMonth()] += s.duration_s;
+  }
+  const max = Math.max(...totals, 1);
+  return MONTH_LABELS.map((label, i) => ({ label, pct: Math.max(2, Math.round((totals[i] / max) * 100)) }));
+}
+
+function computeWeekdays(sessions) {
+  const totals = Array(7).fill(0);
+  for (const s of sessions) {
+    if (!s.started_at || !s.duration_s) continue;
+    totals[localWeekdayMon0(s.started_at)] += s.duration_s;
+  }
+  const max = Math.max(...totals, 1);
+  return WEEKDAY_LABELS.map((label, i) => ({
+    label,
+    total_seconds: totals[i],
+    peak: totals[i] === max && max > 0,
+    pct: Math.max(2, Math.round((totals[i] / max) * 100)),
+  }));
+}
+
+function computeHours(sessions) {
+  const totals = Array(24).fill(0);
+  for (const s of sessions) {
+    if (!s.started_at || !s.duration_s) continue;
+    totals[localHour(s.started_at)] += s.duration_s;
+  }
+  const max = Math.max(...totals, 1);
+  return totals.map(t => ({ pct: Math.max(2, Math.round((t / max) * 100)) }));
+}
+
+function computeHeatmap(sessions, days) {
+  const byDay = new Map();
+  for (const s of sessions) {
+    if (!s.started_at || !s.duration_s) continue;
+    const key = localDateKey(s.started_at);
+    byDay.set(key, (byDay.get(key) ?? 0) + s.duration_s);
+  }
+  const max = Math.max(...byDay.values(), 1);
+  const today = new Date();
+  const cells = [];
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date(today);
+    d.setDate(d.getDate() - i);
+    const total = byDay.get(dayKey(d)) ?? 0;
+    cells.push({ opacity: total ? (0.12 + (total / max) * 0.65).toFixed(2) : 0.05 });
+  }
+  return cells;
+}
+
+function computeStreaks(sessions) {
+  const daySet = new Set();
+  for (const s of sessions) {
+    if (!s.started_at) continue;
+    daySet.add(localDateKey(s.started_at));
+  }
+  if (daySet.size === 0) return { current: 0, longest: 0 };
+
+  const sortedDates = [...daySet].map(k => new Date(`${k}T00:00:00`)).sort((a, b) => a - b);
+  let longest = 1, run = 1;
+  for (let i = 1; i < sortedDates.length; i++) {
+    const diff = Math.round((sortedDates[i] - sortedDates[i - 1]) / 86400000);
+    if (diff === 1) { run++; longest = Math.max(longest, run); } else { run = 1; }
+  }
+
+  const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+  let anchorKey;
+  if (daySet.has(dayKey(today))) anchorKey = dayKey(today);
+  else if (daySet.has(dayKey(yesterday))) anchorKey = dayKey(yesterday);
+  else return { current: 0, longest };
+
+  let current = 0;
+  let d = new Date(`${anchorKey}T00:00:00`);
+  while (daySet.has(dayKey(d))) {
+    current++;
+    d.setDate(d.getDate() - 1);
+  }
+  return { current, longest };
+}
+
+// Average sessions/week across the game's playing lifespan (first → last session).
+function computePerWeek(d) {
+  if (!d.session_count || !d.first_played || !d.last_played) return '0.0';
+  const first = toLocalDate(d.first_played);
+  const last = toLocalDate(d.last_played);
+  const days = Math.max(1, Math.round((last - first) / 86400000) + 1);
+  return (d.session_count / Math.max(1, days / 7)).toFixed(1);
+}
+
+function buildStatsTab(d) {
+  const sessions = d.sessions ?? [];
+  const year = new Date().getFullYear();
+  const months = computeMonths(sessions, year);
+  const heat = computeHeatmap(sessions, HEATMAP_DAYS);
+  const weekdays = computeWeekdays(sessions);
+  const hours = computeHours(sessions);
+  const { current, longest } = computeStreaks(sessions);
+  const perWeek = computePerWeek(d);
+
+  const monthBars = months.map(m => `
+    <div class="wd-col">
+      <div class="wd-bar-wrap"><div class="wd-bar month-bar" style="height:${m.pct}%"></div></div>
+      <div class="wd-label">${m.label}</div>
     </div>`).join('');
 
+  const heatCells = heat.map(h => `<div class="heatmap-cell" style="background:rgba(255,255,255,${h.opacity})"></div>`).join('');
+
+  const weekdayCols = weekdays.map(w => `
+    <div class="wd-col${w.peak ? ' peak' : ''}">
+      <div class="wd-value">${w.total_seconds ? fmtTime(w.total_seconds) : ''}</div>
+      <div class="wd-bar-wrap"><div class="wd-bar" style="height:${w.pct}%"></div></div>
+      <div class="wd-label">${w.label}</div>
+    </div>`).join('');
+
+  const hourBars = hours.map(h => `<div class="hour-bar" style="height:${h.pct}%"></div>`).join('');
+
   return `
-    <div class="stat-panel">
-      <div class="section-header">Todas as sessões</div>
-      <div class="sessions-list sessions-full">${rows}</div>
+    <div class="stats-grid-detail">
+      <div class="stat-panel span-2">
+        <div class="section-header">Tempo por mês</div>
+        <div class="weekday-chart">${monthBars}</div>
+      </div>
+      <div class="stats-card">
+        <div class="stats-card-label">Tempo total</div>
+        <div class="stats-card-value">${fmtTime(d.total_seconds)}</div>
+        <div class="stats-card-sub">${d.session_count} sessões · ${countUniqueDays(sessions)} dias</div>
+      </div>
+      <div class="stat-panel span-2">
+        <div class="section-header">Frequência<span class="section-header-sub">últimas 13 semanas</span></div>
+        <div class="heatmap-grid">${heatCells}</div>
+      </div>
+      <div class="stat-panel pace-panel">
+        <div class="section-header">Ritmo</div>
+        <div class="stat-value-xl">${longest} dias</div>
+        <div class="stat-label">Maior sequência</div>
+        <div class="stat-value-xl">${perWeek}×</div>
+        <div class="stat-label">Sessões por semana</div>
+      </div>
+      <div class="stat-panel">
+        <div class="section-header">Dia da semana</div>
+        <div class="weekday-chart weekday-chart-sm">${weekdayCols}</div>
+      </div>
+      <div class="stat-panel">
+        <div class="section-header">Hora do dia</div>
+        <div class="hour-chart">${hourBars}</div>
+        <div class="hour-chart-axis"><span>00h</span><span>12h</span><span>23h</span></div>
+      </div>
+      <div class="stat-panel">
+        <div class="section-header">Sessões</div>
+        <div class="stat-rows">
+          <div class="stat-row"><span>Mais longa</span><span>${fmtTime(d.longest_session_s)}</span></div>
+          <div class="stat-row"><span>Média</span><span>${fmtTime(d.avg_session_s ? Math.round(d.avg_session_s) : null)}</span></div>
+          <div class="stat-row"><span>Melhor dia</span><span>${fmtDayDate(d.best_day)}</span></div>
+          <div class="stat-row"><span>Primeira vez</span><span>${fmtDate(d.first_played)}</span></div>
+        </div>
+      </div>
     </div>`;
 }
 

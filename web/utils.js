@@ -60,6 +60,19 @@ export function localDateKey(iso) {
   return `${y}-${m}-${day}`;
 }
 
+export function localHour(iso) {
+  if (!iso) return null;
+  const s = iso.includes('Z') ? iso : iso + 'Z';
+  return new Date(s).getHours();
+}
+
+// Monday=0 .. Sunday=6, matching the daemon's Python weekday() convention.
+export function localWeekdayMon0(iso) {
+  if (!iso) return null;
+  const s = iso.includes('Z') ? iso : iso + 'Z';
+  return (new Date(s).getDay() + 6) % 7;
+}
+
 export function fmtSource(src) {
   return SOURCE_LABEL[src] || src || '—';
 }
