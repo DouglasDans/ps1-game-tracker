@@ -2,9 +2,9 @@ import { fetchGames, fetchStats, fetchActivity } from '../data/api.js';
 import { fmtTime, cardGradient, platformLogoImg } from '../utils.js';
 
 const TABS = [
-  { key: 'overview', label: 'Visão geral' },
-  { key: 'activity', label: 'Atividade' },
-  { key: 'library', label: 'Biblioteca' },
+  { key: 'overview', label: 'Visão geral', icon: 'dashboard' },
+  { key: 'activity', label: 'Atividade', icon: 'timeline' },
+  { key: 'library', label: 'Biblioteca', icon: 'grid_view' },
 ];
 
 export function mount(container, navigate, params = {}) {
@@ -25,7 +25,7 @@ export function mount(container, navigate, params = {}) {
       };
 
       const rail = TABS.map((t, i) =>
-        `<div class="rail-item${i === tabIndex ? ' active' : ''}" data-tab="${t.key}">${t.label}</div>`
+        `<div class="rail-item${i === tabIndex ? ' active' : ''}" data-tab="${t.key}"><span class="msr">${t.icon}</span>${t.label}</div>`
       ).join('');
 
       container.innerHTML = `<div class="screen-stats">
@@ -99,8 +99,10 @@ const DAY_PERIODS = [
 ];
 
 function panel(title, body, sub) {
-  return `<div class="stat-panel">
-    <div class="section-header">${title}${sub ? `<span class="section-header-sub">${sub}</span>` : ''}</div>
+  return `<div class="pg-panel">
+    ${sub
+      ? `<div class="pg-panel-head"><span class="pg-panel-title">${title}</span><span class="pg-panel-sub">${sub}</span></div>`
+      : `<div class="pg-panel-title">${title}</div>`}
     ${body}
   </div>`;
 }
@@ -135,24 +137,20 @@ function buildOverview(s, games) {
   return `
     <div class="stats-summary-cards">
       <div class="stats-card">
-        <div class="stats-card-label">Tempo total</div>
+        <div class="stats-card-label"><span class="msr">schedule</span>Tempo total</div>
         <div class="stats-card-value">${fmtTime(s.total_seconds)}</div>
-        <div class="stats-card-sub">em todas as plataformas</div>
       </div>
       <div class="stats-card">
-        <div class="stats-card-label">Jogos</div>
+        <div class="stats-card-label"><span class="msr">videogame_asset</span>Jogos</div>
         <div class="stats-card-value">${s.total_games}</div>
-        <div class="stats-card-sub">com pelo menos 1 sessão</div>
       </div>
       <div class="stats-card">
-        <div class="stats-card-label">Sessões</div>
+        <div class="stats-card-label"><span class="msr">replay</span>Sessões</div>
         <div class="stats-card-value">${s.total_sessions ?? 0}</div>
-        <div class="stats-card-sub">sessões encerradas</div>
       </div>
       <div class="stats-card">
-        <div class="stats-card-label">Dias jogados</div>
+        <div class="stats-card-label"><span class="msr">calendar_month</span>Dias jogados</div>
         <div class="stats-card-value">${s.total_days_played ?? 0}</div>
-        <div class="stats-card-sub">dias distintos com sessão</div>
       </div>
     </div>
 

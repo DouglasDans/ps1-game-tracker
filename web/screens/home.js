@@ -1,8 +1,8 @@
 import { fetchGames, fetchActiveSession } from '../data/api.js';
 import { fmtTime, fmtDateShort, fmtSource, cardGradient, hueGradient, hueOf, hueOfName, platformLogoImg, extractDominantColor } from '../utils.js';
 
-const CARD_W         = 130;
-const CARD_GAP       = 14;
+const CARD_W         = 132;
+const CARD_GAP       = 18;
 const POLL_ACTIVE_MS = 10000;
 
 let _savedIndex = 0;
@@ -107,7 +107,10 @@ function buildHTML(items, selectedIndex, active) {
     const sel = i === selectedIndex ? ' selected' : '';
     if (item._lib) {
       return `<div class="game-card card-library${sel}" data-idx="${i}">
-        <div class="card-library-inner">LIBRARY</div>
+        <div class="card-library-inner">
+          <span class="msr">grid_view</span>
+          <span>BIBLIOTECA</span>
+        </div>
       </div>`;
     }
     const isActive = active && item.id === active.game_id;
@@ -137,29 +140,29 @@ function buildHTML(items, selectedIndex, active) {
           </div>
         </div>
         <div class="hero-stats-grid" id="hero-stats-grid">
-          <div class="insight-card hero-stat-tile hero-stat-tile-accent">
-            <div class="insight-card-label">Tempo total</div>
-            <div class="insight-card-value" id="hero-total"></div>
+          <div class="hero-stat-tile hero-stat-tile-accent">
+            <div class="hero-stat-tile-label"><span class="msr">schedule</span>Tempo total</div>
+            <div class="hero-stat-tile-value" id="hero-total"></div>
           </div>
-          <div class="insight-card hero-stat-tile">
-            <div class="insight-card-label">Sessões</div>
-            <div class="insight-card-value" id="hero-sessions"></div>
+          <div class="hero-stat-tile hero-stat-tile-lg">
+            <div class="hero-stat-tile-label"><span class="msr">replay</span>Sessões</div>
+            <div class="hero-stat-tile-value" id="hero-sessions"></div>
           </div>
-          <div class="insight-card hero-stat-tile">
-            <div class="insight-card-label">Último acesso</div>
-            <div class="insight-card-value" id="hero-last-session"></div>
+          <div class="hero-stat-tile">
+            <div class="hero-stat-tile-label"><span class="msr">event</span>Último acesso</div>
+            <div class="hero-stat-tile-value" id="hero-last-session"></div>
           </div>
-          <div class="insight-card hero-stat-tile">
-            <div class="insight-card-label">Média por sessão</div>
-            <div class="insight-card-value" id="hero-avg"></div>
+          <div class="hero-stat-tile">
+            <div class="hero-stat-tile-label"><span class="msr">timelapse</span>Média por sessão</div>
+            <div class="hero-stat-tile-value" id="hero-avg"></div>
           </div>
-          <div class="insight-card hero-stat-tile">
-            <div class="insight-card-label">Dias jogados</div>
-            <div class="insight-card-value" id="hero-days"></div>
+          <div class="hero-stat-tile">
+            <div class="hero-stat-tile-label"><span class="msr">calendar_month</span>Dias jogados</div>
+            <div class="hero-stat-tile-value" id="hero-days"></div>
           </div>
-          <div class="insight-card hero-stat-tile">
-            <div class="insight-card-label">Emulador</div>
-            <div class="insight-card-value" id="hero-emulator"></div>
+          <div class="hero-stat-tile">
+            <div class="hero-stat-tile-label"><span class="msr">memory</span>Emulador</div>
+            <div class="hero-stat-tile-value" id="hero-emulator"></div>
           </div>
         </div>
       </div>

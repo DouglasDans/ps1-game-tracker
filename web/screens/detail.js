@@ -206,17 +206,12 @@ function buildOverviewTab(d) {
     </div>`).join('');
 
   return `
-    <div class="stat-panel">
-      <div class="insight-cards">${meta}</div>
-    </div>
-    ${d.summary ? `<div class="stat-panel">
-      <div class="section-header">Sinopse</div>
+    <div class="insight-cards">${meta}</div>
+    ${d.summary ? `<div class="detail-synopsis-panel">
+      <div class="detail-synopsis-head"><span>Sinopse</span><span class="detail-synopsis-source">Fonte: IGDB</span></div>
       <p class="detail-summary">${d.summary}</p>
     </div>` : ''}
-    <div class="stat-panel">
-      <div class="section-header">Estatísticas</div>
-      <div class="insight-cards">${insights}</div>
-    </div>`;
+    <div class="insight-cards-loose">${insights}</div>`;
 }
 
 function dayKey(date) {
@@ -353,37 +348,37 @@ function buildStatsTab(d) {
 
   return `
     <div class="stats-grid-detail">
-      <div class="stat-panel span-2">
-        <div class="section-header">Tempo por mês</div>
-        <div class="weekday-chart">${monthBars}</div>
+      <div class="pg-panel span-2">
+        <div class="pg-panel-head"><span class="pg-panel-title">Tempo por mês</span><span class="pg-panel-sub">${year}</span></div>
+        <div class="month-chart">${monthBars}</div>
       </div>
-      <div class="stats-card">
-        <div class="stats-card-label">Tempo total</div>
-        <div class="stats-card-value">${fmtTime(d.total_seconds)}</div>
-        <div class="stats-card-sub">${d.session_count} sessões · ${countUniqueDays(sessions)} dias</div>
+      <div class="pg-panel pg-panel-flex">
+        <div class="pg-panel-title">Tempo total</div>
+        <div class="pg-total-value">${fmtTime(d.total_seconds)}</div>
+        <div class="pg-panel-sub">${d.session_count} SESSÕES · ${countUniqueDays(sessions)} DIAS</div>
       </div>
-      <div class="stat-panel span-2">
-        <div class="section-header">Frequência<span class="section-header-sub">últimas 13 semanas</span></div>
+      <div class="pg-panel span-2">
+        <div class="pg-panel-head"><span class="pg-panel-title">Frequência</span><span class="pg-panel-sub">ÚLTIMAS 13 SEMANAS</span></div>
         <div class="heatmap-grid">${heatCells}</div>
       </div>
-      <div class="stat-panel pace-panel">
-        <div class="section-header">Ritmo</div>
-        <div class="stat-value-xl">${longest} dias</div>
-        <div class="stat-label">Maior sequência</div>
-        <div class="stat-value-xl">${perWeek}×</div>
-        <div class="stat-label">Sessões por semana</div>
+      <div class="pg-panel pace-panel">
+        <div class="pg-panel-title">Ritmo</div>
+        <div class="pace-value">${longest} dias</div>
+        <div class="pg-panel-sub">MAIOR SEQUÊNCIA</div>
+        <div class="pace-value">${perWeek}×</div>
+        <div class="pg-panel-sub">SESSÕES POR SEMANA</div>
       </div>
-      <div class="stat-panel">
-        <div class="section-header">Dia da semana</div>
+      <div class="pg-panel">
+        <div class="pg-panel-title">Dia da semana</div>
         <div class="weekday-chart weekday-chart-sm">${weekdayCols}</div>
       </div>
-      <div class="stat-panel">
-        <div class="section-header">Hora do dia</div>
+      <div class="pg-panel">
+        <div class="pg-panel-title">Hora do dia</div>
         <div class="hour-chart">${hourBars}</div>
         <div class="hour-chart-axis"><span>00h</span><span>12h</span><span>23h</span></div>
       </div>
-      <div class="stat-panel">
-        <div class="section-header">Sessões</div>
+      <div class="pg-panel">
+        <div class="pg-panel-title">Sessões</div>
         <div class="stat-rows">
           <div class="stat-row"><span>Mais longa</span><span>${fmtTime(d.longest_session_s)}</span></div>
           <div class="stat-row"><span>Média</span><span>${fmtTime(d.avg_session_s ? Math.round(d.avg_session_s) : null)}</span></div>
