@@ -183,13 +183,26 @@ def test_import_sessions_creates_session_for_new_content(conn, tmp_path):
 def test_import_sessions_sets_platform_from_playlist(conn, tmp_path):
     logs_dir = tmp_path / "logs"
     logs_dir.mkdir()
-    (logs_dir / "Ico.lrtl").write_text(json.dumps(_LRTL))
-    _write_playlist(tmp_path, [_ps1_item("Ico")])
+    (logs_dir / "Sonic the Hedgehog 2.lrtl").write_text(json.dumps(_LRTL))
+    _write_playlist(tmp_path, [_megadrive_item("Sonic the Hedgehog 2")], filename="Sega - Mega Drive - Genesis.lpl")
 
     import_sessions(conn, [str(tmp_path)])
 
     row = conn.execute("SELECT platform FROM games").fetchone()
-    assert row["platform"] == "PS1"
+    assert row["platform"] == "Mega Drive"
+
+
+def test_import_sessions_skips_ps1_platform(conn, tmp_path):
+    logs_dir = tmp_path / "logs"
+    logs_dir.mkdir()
+    (logs_dir / "Ico.lrtl").write_text(json.dumps(_LRTL))
+    _write_playlist(tmp_path, [_ps1_item("Ico")])
+
+    n = import_sessions(conn, [str(tmp_path)])
+
+    assert n == 0
+    assert conn.execute("SELECT COUNT(*) FROM sessions").fetchone()[0] == 0
+    assert conn.execute("SELECT COUNT(*) FROM games").fetchone()[0] == 0
 
 
 def test_import_sessions_imports_game_not_in_playlist(conn, tmp_path):

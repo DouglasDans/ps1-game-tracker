@@ -151,12 +151,14 @@ def _import_file(conn: sqlite3.Connection, lrtl_path: Path, playlist_map: dict[s
         return 0
 
     content_name = normalize_game_name(lrtl_path.stem)
+    platform = playlist_map.get(content_name.lower()) or None
+    if platform == "PS1":
+        return 0
+
     runtime_s, last_played = parsed
     delta_s = runtime_s - _known_runtime_s(conn, content_name)
     if delta_s <= 0:
         return 0
-
-    platform = playlist_map.get(content_name.lower()) or None
     file_path = f"retroarch://{content_name}"
     game_id = upsert_game(conn, file_path, display_name=content_name, canonical_name=content_name, platform=platform)
     started_at = last_played - timedelta(seconds=delta_s)
