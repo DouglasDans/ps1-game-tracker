@@ -21,6 +21,8 @@
   --card-h: 188px;
   --card-w-sel: 175px;
   --card-h-sel: 253px;
+  --card-w-detail: calc(var(--card-w-sel) * 1.6);
+  --card-h-detail: calc(var(--card-h-sel) * 1.6);
   --top-h: 64px;
   --bot-h: 48px;
   --side-pad: clamp(32px, 5vw, 96px);
@@ -78,25 +80,33 @@ body {
 }
 
 .nav-item {
-  padding: 6px 18px;
-  font-size: 0.8rem;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 20px;
+  font-size: 0.78rem;
   font-weight: 600;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--text-muted);
-  border-radius: 4px;
+  color: rgba(240, 240, 248, 0.5);
+  border-radius: 999px;
   cursor: pointer;
   transition:
     color 0.15s,
     background 0.15s;
 }
 
+.nav-item .msr {
+  font-size: 1.15rem;
+}
+
 .nav-item:hover {
   color: var(--text-dim);
 }
 .nav-item.active {
-  color: var(--text);
-  background: rgba(255, 255, 255, 0.06);
+  color: #0b0d12;
+  background: #f2f3f5;
+  font-weight: 700;
 }
 
 .top-clock {
@@ -110,6 +120,7 @@ body {
 #main {
   overflow: hidden;
   position: relative;
+  view-transition-name: main-content;
 }
 
 /* ── Bottom bar ── */
@@ -736,15 +747,15 @@ body {
 
 .detail-side {
   flex-shrink: 0;
-  width: 280px;
+  width: var(--card-w-detail);
   display: flex;
   flex-direction: column;
   gap: 24px;
 }
 
 .detail-cover {
-  width: 280px;
-  height: 400px;
+  width: var(--card-w-detail);
+  height: var(--card-h-detail);
   border-radius: var(--radius);
   overflow: hidden;
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
@@ -762,7 +773,7 @@ body {
 }
 
 .detail-rail {
-  width: 280px;
+  width: var(--card-w-detail);
 }
 
 .detail-tab-content {
@@ -1198,6 +1209,45 @@ body {
   font-size: 0.8rem;
   color: var(--text-muted);
   font-variant-numeric: tabular-nums;
+}
+
+/* ── Screen transitions (native View Transitions API) ── */
+@media (prefers-reduced-motion: no-preference) {
+  /* Scoped to #main only (via view-transition-name: main-content above) —
+     the header/footer bars sit outside #main and must stay static. */
+  ::view-transition-old(main-content),
+  ::view-transition-new(main-content) {
+    animation-duration: 0.3s;
+    animation-timing-function: cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  }
+
+  :root[data-transition="detail-open"]::view-transition-new(main-content) {
+    animation-name: panel-slide-in;
+  }
+  :root[data-transition="detail-open"]::view-transition-old(main-content) {
+    animation-name: panel-recede;
+  }
+  :root[data-transition="detail-close"]::view-transition-old(main-content) {
+    animation-name: panel-slide-out;
+  }
+  :root[data-transition="detail-close"]::view-transition-new(main-content) {
+    animation-name: panel-return;
+  }
+}
+
+@keyframes panel-slide-in {
+  from { transform: translateY(-32px); opacity: 0; }
+  to   { transform: translateY(0); opacity: 1; }
+}
+@keyframes panel-recede {
+  to { opacity: 0.4; }
+}
+@keyframes panel-slide-out {
+  to { transform: translateY(-32px); opacity: 0; }
+}
+@keyframes panel-return {
+  from { opacity: 0.4; }
+  to   { opacity: 1; }
 }
 
 /* ── Scrollbar ── */

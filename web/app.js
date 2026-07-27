@@ -13,13 +13,29 @@ let currentScreen = null;
 // Games and keep their own shoulder-button behavior.
 const TOP_PAGES = ['home', 'stats'];
 
+// Wraps a screen swap in the native View Transitions API so navigation
+// gets a default crossfade for free; 'detail-open'/'detail-close' additionally
+// get a custom slide via the CSS in style.css keyed off data-transition.
+function withViewTransition(updateDOM, kind) {
+  if (!document.startViewTransition) { updateDOM(); return; }
+  document.documentElement.dataset.transition = kind || '';
+  const transition = document.startViewTransition(updateDOM);
+  transition.finished.finally(() => { delete document.documentElement.dataset.transition; });
+}
+
 export function navigate(screen, params = {}) {
-  if (currentCleanup) { currentCleanup(); currentCleanup = null; }
-  currentScreen = screen;
-  const main = document.getElementById('main');
-  currentCleanup = SCREENS[screen](main, navigate, params) ?? null;
-  updateNav(screen);
-  updateHints(screen);
+  const kind = screen === 'detail' ? 'detail-open'
+    : currentScreen === 'detail' ? 'detail-close'
+    : null;
+
+  withViewTransition(() => {
+    if (currentCleanup) { currentCleanup(); currentCleanup = null; }
+    currentScreen = screen;
+    const main = document.getElementById('main');
+    currentCleanup = SCREENS[screen](main, navigate, params) ?? null;
+    updateNav(screen);
+    updateHints(screen);
+  }, kind);
 }
 
 function initPageSwitcher() {
@@ -40,7 +56,7 @@ function updateNav(screen) {
 
 const SCREEN_HINTS = {
   home: `
-    <span class="hint"><span class="hint-btn">✕</span> Selecionar</span>
+    <span class="hint"><span class="hint-btn">✕</span><span class="hint-btn">↓</span> Detalhes</span>
     <span class="hint"><span class="hint-btn">□</span> Library</span>
     <span class="hint"><span class="hint-btn hint-btn-wide">R1</span> Stats</span>`,
   stats: `
