@@ -1,5 +1,5 @@
 import { fetchGames } from '../data/api.js';
-import { fmtTime, cardGradient } from '../utils.js';
+import { fmtTime, cardGradient, platformLogoImg } from '../utils.js';
 
 const SORT_MODES = [
   { key: 'top',    label: 'Mais jogado', cmp: (a, b) => (b.total_seconds ?? 0) - (a.total_seconds ?? 0) },
@@ -190,17 +190,25 @@ export function mount(container, navigate, params = {}) {
 
 function buildHTML(platforms, games, selectedIndex, platformFilter, sortIndex) {
   const railItems = platforms.map(p => {
-    const label = p === 'all' ? 'Todos' : p;
+    const label = p === 'all'
+      ? '<span class="msr">apps</span>Todos'
+      : platformLogoImg(p, 'rail-platform-logo');
     return `<div class="rail-item${p === platformFilter ? ' active' : ''}" data-platform="${p}">${label}</div>`;
   }).join('');
+
+  const totalSeconds = games.reduce((a, g) => a + (g.total_seconds ?? 0), 0);
 
   return `<div class="screen-library">
     <aside class="side-rail">
       ${railItems}
       <div class="rail-separator"></div>
-      <div class="rail-item rail-sort">Ordenar: ${SORT_MODES[sortIndex].label}</div>
+      <div class="rail-item rail-sort"><span class="msr">swap_vert</span>Ordenar: ${SORT_MODES[sortIndex].label}</div>
     </aside>
     <div class="library-main">
+      <div class="library-header">
+        <h1>Biblioteca</h1>
+        <span class="library-header-meta">${games.length} JOGOS · ${fmtTime(totalSeconds)} JOGADAS</span>
+      </div>
       <div class="library-grid">${gridHTML(games, selectedIndex)}</div>
     </div>
   </div>`;
@@ -210,15 +218,14 @@ function gridHTML(games, selectedIndex) {
   return games.map((g, i) => {
     const cover = g.cover_url
       ? `<img src="${g.cover_url}" alt="" class="cover-img">`
-      : `<div class="cover-gradient" style="background:${cardGradient(g.display_name)};width:100%;height:100%;display:flex;align-items:flex-end;padding:10px">
-           <span class="card-name-fb" style="font-size:0.72rem">${g.display_name.toUpperCase()}</span>
-         </div>`;
+      : `<div class="cover-gradient" style="background:${cardGradient(g.display_name)}"></div>`;
     return `<div class="lib-card${i === selectedIndex ? ' selected' : ''}" data-id="${g.id}">
       <div class="lib-card-cover">
         ${cover}
+        <div class="card-title-overlay"><span>${g.display_name}</span></div>
       </div>
       <div class="lib-card-name">${g.display_name}</div>
-      <div class="lib-card-time">${fmtTime(g.total_seconds)}</div>
+      <div class="lib-card-time"><span class="msr">schedule</span>${fmtTime(g.total_seconds)}</div>
     </div>`;
   }).join('');
 }
