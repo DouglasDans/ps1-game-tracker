@@ -1,5 +1,5 @@
 import { fetchGames, fetchActiveSession } from '../data/api.js';
-import { fmtTime, fmtDateShort, fmtSource, cardGradient, hueGradient, hueOf, platformLogoImg, extractDominantColor } from '../utils.js';
+import { fmtTime, fmtDateShort, fmtSource, cardGradient, hueGradient, hueOf, hueOfName, platformLogoImg, extractDominantColor } from '../utils.js';
 
 const CARD_W         = 130;
 const CARD_GAP       = 14;
@@ -41,6 +41,13 @@ export function mount(container, navigate, params = {}) {
           case 'Square':
             e.preventDefault();
             navigate('library');
+            break;
+          case 'ArrowDown':
+            e.preventDefault();
+            if (!items[selectedIndex]._lib) {
+              _savedIndex = selectedIndex;
+              navigate('detail', { gameId: items[selectedIndex].id });
+            }
             break;
           case 'Enter':
           case ' ':
@@ -106,11 +113,10 @@ function buildHTML(items, selectedIndex, active) {
     const isActive = active && item.id === active.game_id;
     const cover = item.cover_url
       ? `<img src="${item.cover_url}" alt="" class="cover-img">`
-      : `<div class="cover-gradient" style="background:${cardGradient(item.display_name)}">
-           <span class="card-name-fb">${item.display_name.toUpperCase()}</span>
-         </div>`;
+      : `<div class="cover-gradient" style="background:${cardGradient(item.display_name)}"></div>`;
     return `<div class="game-card${sel}${isActive ? ' has-active' : ''}" data-idx="${i}" data-id="${item.id}">
       ${cover}
+      <div class="card-title-overlay"><span>${item.display_name}</span></div>
       <div class="card-active-dot"></div>
     </div>`;
   }).join('');
@@ -119,23 +125,41 @@ function buildHTML(items, selectedIndex, active) {
     <div class="section-home" id="section-home">
       <div class="home-backdrop" id="home-backdrop"></div>
       <div class="hero">
-        <div class="hero-meta">
-          <span class="badge badge-active" id="hero-badge" hidden></span>
-          <span class="hero-platform-info" id="hero-platform-info"></span>
+        <div class="hero-info">
+          <div class="hero-meta">
+            <span class="badge badge-active" id="hero-badge" hidden></span>
+            <span class="hero-platform-info" id="hero-platform-info"></span>
+          </div>
+          <h1 class="hero-title" id="hero-title"></h1>
+          <p class="hero-summary" id="hero-summary"></p>
+          <div class="hero-cta" id="hero-cta">
+            <span class="msr">expand_more</span> Visão geral e estatísticas
+          </div>
         </div>
-        <h1 class="hero-title" id="hero-title"></h1>
-        <div class="hero-stats">
-          <div class="hero-stat">
-            <div class="stat-label">ÚLTIMA SESSÃO</div>
-            <div class="stat-value" id="hero-last-session"></div>
+        <div class="hero-stats-grid" id="hero-stats-grid">
+          <div class="insight-card hero-stat-tile hero-stat-tile-accent">
+            <div class="insight-card-label">Tempo total</div>
+            <div class="insight-card-value" id="hero-total"></div>
           </div>
-          <div class="hero-stat">
-            <div class="stat-label">EMULADOR</div>
-            <div class="stat-value" id="hero-emulator"></div>
+          <div class="insight-card hero-stat-tile">
+            <div class="insight-card-label">Sessões</div>
+            <div class="insight-card-value" id="hero-sessions"></div>
           </div>
-          <div class="hero-stat">
-            <div class="stat-label">SESSÕES</div>
-            <div class="stat-value" id="hero-sessions"></div>
+          <div class="insight-card hero-stat-tile">
+            <div class="insight-card-label">Último acesso</div>
+            <div class="insight-card-value" id="hero-last-session"></div>
+          </div>
+          <div class="insight-card hero-stat-tile">
+            <div class="insight-card-label">Média por sessão</div>
+            <div class="insight-card-value" id="hero-avg"></div>
+          </div>
+          <div class="insight-card hero-stat-tile">
+            <div class="insight-card-label">Dias jogados</div>
+            <div class="insight-card-value" id="hero-days"></div>
+          </div>
+          <div class="insight-card hero-stat-tile">
+            <div class="insight-card-label">Emulador</div>
+            <div class="insight-card-value" id="hero-emulator"></div>
           </div>
         </div>
       </div>
@@ -154,6 +178,11 @@ function setBackdropGradient(el, baseGradient) {
   el.classList.add('visible');
 }
 
+function setAccentGame(hue) {
+  const section = document.getElementById('section-home');
+  if (section) section.style.setProperty('--accent-game', `hsl(${hue}, 70%, 66%)`);
+}
+
 function updateBackdrop(item) {
   const el = document.getElementById('home-backdrop');
   if (!el) return;
@@ -165,11 +194,14 @@ function updateBackdrop(item) {
   }
   if (!item.cover_url) {
     setBackdropGradient(el, cardGradient(item.display_name));
+    setAccentGame(hueOfName(item.display_name));
     return;
   }
   extractDominantColor(item.cover_url).then(c => {
     if (!c || token !== _backdropToken || !el.isConnected) return;
-    setBackdropGradient(el, hueGradient(hueOf(c)));
+    const hue = hueOf(c);
+    setBackdropGradient(el, hueGradient(hue));
+    setAccentGame(hue);
   });
 }
 
@@ -178,20 +210,31 @@ function updateHero(item, active, games) {
   const badge        = document.getElementById('hero-badge');
   const platformInfo = document.getElementById('hero-platform-info');
   const title        = document.getElementById('hero-title');
+  const summary      = document.getElementById('hero-summary');
+  const cta          = document.getElementById('hero-cta');
+  const statsGrid    = document.getElementById('hero-stats-grid');
+  const total        = document.getElementById('hero-total');
   const lastSession  = document.getElementById('hero-last-session');
   const emulator     = document.getElementById('hero-emulator');
   const sessions     = document.getElementById('hero-sessions');
+  const avg          = document.getElementById('hero-avg');
+  const days         = document.getElementById('hero-days');
   if (!badge) return;
 
   if (item._lib) {
     badge.hidden = true;
     platformInfo.innerHTML = 'TODOS OS JOGOS';
     title.textContent = 'Biblioteca';
-    lastSession.textContent = '—';
-    emulator.textContent = '—';
+    summary.hidden = true;
+    cta.hidden = true;
+    statsGrid.hidden = true;
     sessions.textContent = `${games.length} jogos`;
     return;
   }
+
+  summary.hidden = !item.summary;
+  cta.hidden = false;
+  statsGrid.hidden = false;
 
   const isActive = active && item.id === active.game_id;
   if (isActive) {
@@ -203,11 +246,17 @@ function updateHero(item, active, games) {
     badge.hidden = true;
   }
 
-  platformInfo.innerHTML = `${item.platform ? `${platformLogoImg(item.platform, 'hero-platform-logo')} · ` : ''}${fmtTime(item.total_seconds)} TOTAL`;
+  const meta = [item.release_year, item.genre, item.developer].filter(Boolean).join(' · ');
+  platformInfo.innerHTML = `${item.platform ? `${platformLogoImg(item.platform, 'hero-platform-logo')} · ` : ''}${meta}`;
   title.textContent = item.display_name;
-  lastSession.textContent = fmtDateShort(item.last_played);
-  emulator.textContent = fmtSource(item.last_source);
+  summary.textContent = item.summary ?? '';
+
+  total.textContent = fmtTime(item.total_seconds);
   sessions.textContent = item.session_count;
+  lastSession.textContent = fmtDateShort(item.last_played);
+  avg.textContent = fmtTime(item.session_count ? Math.round(item.total_seconds / item.session_count) : null);
+  days.textContent = item.days_played ?? '—';
+  emulator.textContent = fmtSource(item.last_source);
 }
 
 function scrollRow(selectedIndex) {

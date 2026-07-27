@@ -68,10 +68,14 @@ export function hueGradient(hue) {
   return `linear-gradient(145deg, hsl(${hue},65%,38%), hsl(${(hue + 50) % 360},55%,18%))`;
 }
 
-export function cardGradient(name) {
+export function hueOfName(name) {
   let h = 0;
   for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
-  return hueGradient(h % 360);
+  return h % 360;
+}
+
+export function cardGradient(name) {
+  return hueGradient(hueOfName(name));
 }
 
 // Hue (0-360) of an "r, g, b" string produced by extractDominantColor.
