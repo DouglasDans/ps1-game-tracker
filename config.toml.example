@@ -15,6 +15,9 @@ rom_dirs = ["/mnt/usb-flash"]
 samba_rom_dirs = []  # ex: ["/srv/samba/ps2roms"]
 # Polls consecutivos sem lock antes de fechar sessão samba (OPL pode liberar o lock brevemente durante boot)
 samba_debounce_polls = 3
+# Janela (segundos) para retomar a mesma sessão em vez de abrir uma nova, se o mesmo
+# jogo+fonte reaparecer logo após o fechamento (evita sessão fantasma partida ao meio)
+session_resume_grace_s = 35
 
 # RetroArch — diretório de playlists para importar sessões via .lrtl
 retroarch_playlist_dirs = []  # ex: ["~/.config/retroarch/playlists"]

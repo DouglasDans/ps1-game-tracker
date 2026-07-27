@@ -185,7 +185,8 @@ async def lifespan(app: FastAPI):
         if n:
             logger.info("lrtl startup import: %d session(s)", n)
 
-    manager = SessionManager(conn)
+    resume_grace_s = config["watchers"].get("session_resume_grace_s", 35)
+    manager = SessionManager(conn, resume_grace_s=resume_grace_s)
     stop_event = threading.Event()
     enrich_q: queue.Queue = queue.Queue()
     app.state.conn = conn

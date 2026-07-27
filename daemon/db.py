@@ -131,6 +131,21 @@ def close_session(conn: sqlite3.Connection, session_id: int, abnormal: bool = Fa
     conn.commit()
 
 
+def resume_session(conn: sqlite3.Connection, session_id: int) -> None:
+    conn.execute(
+        """
+        UPDATE sessions
+        SET ended_at         = NULL,
+            duration_s       = NULL,
+            ended_abnormally = 0,
+            heartbeat_at     = datetime('now')
+        WHERE id = ?
+        """,
+        (session_id,),
+    )
+    conn.commit()
+
+
 def heartbeat(conn: sqlite3.Connection, session_id: int) -> None:
     conn.execute(
         "UPDATE sessions SET heartbeat_at = datetime('now') WHERE id = ?",

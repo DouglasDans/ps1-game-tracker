@@ -255,3 +255,94 @@ def test_infer_metadata_persisted_on_game_start(conn):
     row = conn.execute("SELECT display_name, platform FROM games").fetchone()
     assert row["display_name"] == "CTR - Crash Team Racing"
     assert row["platform"] == "PS1"
+
+
+# --- resume window (session split debounce) ---
+
+def test_resume_within_grace_reopens_same_session(conn):
+    clock = [0.0]
+    manager = SessionManager(conn, resume_grace_s=35, now_fn=lambda: clock[0])
+    manager.on_game_start("/mnt/PS2SMB/DVD/SLUS_205.54.Metal Gear Solid 2.iso", "samba")
+    session_id = manager._active_session_id
+    manager.on_game_stop()
+
+    clock[0] = 10.0  # dentro da janela de 35s
+    manager.on_game_start("/mnt/PS2SMB/DVD/SLUS_205.54.Metal Gear Solid 2.iso", "samba")
+
+    count = conn.execute("SELECT COUNT(*) FROM sessions").fetchone()[0]
+    assert count == 1
+    row = conn.execute("SELECT id, ended_at FROM sessions").fetchone()
+    assert row["id"] == session_id
+    assert row["ended_at"] is None
+
+
+def test_resume_after_grace_expires_opens_new_session(conn):
+    clock = [0.0]
+    manager = SessionManager(conn, resume_grace_s=35, now_fn=lambda: clock[0])
+    manager.on_game_start("/mnt/PS2SMB/DVD/SLUS_205.54.Metal Gear Solid 2.iso", "samba")
+    manager.on_game_stop()
+
+    clock[0] = 40.0  # fora da janela de 35s
+    manager.on_game_start("/mnt/PS2SMB/DVD/SLUS_205.54.Metal Gear Solid 2.iso", "samba")
+
+    count = conn.execute("SELECT COUNT(*) FROM sessions").fetchone()[0]
+    assert count == 2
+
+
+def test_resume_does_not_merge_different_game(conn):
+    clock = [0.0]
+    manager = SessionManager(conn, resume_grace_s=35, now_fn=lambda: clock[0])
+    manager.on_game_start("/roms/mgs.cue", "duckstation")
+    manager.on_game_stop()
+
+    clock[0] = 5.0
+    manager.on_game_start("/roms/crash.chd", "duckstation")
+
+    sessions = conn.execute("SELECT * FROM sessions ORDER BY id").fetchall()
+    assert len(sessions) == 2
+    assert sessions[0]["ended_at"] is not None
+    assert sessions[1]["ended_at"] is None
+
+
+def test_resume_requires_same_source(conn):
+    clock = [0.0]
+    manager = SessionManager(conn, resume_grace_s=35, now_fn=lambda: clock[0])
+    manager.on_game_start("/roms/mgs.cue", "duckstation")
+    manager.on_game_stop()
+
+    clock[0] = 5.0
+    manager.on_game_start("/roms/mgs.cue", "retroarch")
+
+    count = conn.execute("SELECT COUNT(*) FROM sessions").fetchone()[0]
+    assert count == 2
+
+
+def test_resume_then_stop_recomputes_duration(conn):
+    clock = [0.0]
+    manager = SessionManager(conn, resume_grace_s=35, now_fn=lambda: clock[0])
+    manager.on_game_start("/mnt/PS2SMB/DVD/SLUS_205.54.Metal Gear Solid 2.iso", "samba")
+    manager.on_game_stop()
+
+    clock[0] = 10.0
+    manager.on_game_start("/mnt/PS2SMB/DVD/SLUS_205.54.Metal Gear Solid 2.iso", "samba")
+    manager.on_game_stop()
+
+    count = conn.execute("SELECT COUNT(*) FROM sessions").fetchone()[0]
+    assert count == 1
+    row = conn.execute("SELECT ended_at, duration_s FROM sessions").fetchone()
+    assert row["ended_at"] is not None
+    assert row["duration_s"] is not None
+
+
+def test_resume_heartbeat_still_works(conn):
+    clock = [0.0]
+    manager = SessionManager(conn, resume_grace_s=35, now_fn=lambda: clock[0])
+    manager.on_game_start("/mnt/PS2SMB/DVD/SLUS_205.54.Metal Gear Solid 2.iso", "samba")
+    manager.on_game_stop()
+
+    clock[0] = 10.0
+    manager.on_game_start("/mnt/PS2SMB/DVD/SLUS_205.54.Metal Gear Solid 2.iso", "samba")
+    manager.send_heartbeat()
+
+    row = conn.execute("SELECT heartbeat_at FROM sessions WHERE ended_at IS NULL").fetchone()
+    assert row is not None
