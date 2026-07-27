@@ -68,6 +68,7 @@ def init_db(conn: sqlite3.Connection) -> None:
                 FROM sessions s2
                 JOIN games g2 ON g2.id = s2.game_id
                 WHERE COALESCE(g2.canonical_name, g2.file_path) = COALESCE(g.canonical_name, g.file_path)
+                  AND COALESCE(g2.platform, '') = COALESCE(g.platform, '')
                   AND s2.ended_at IS NOT NULL
                 ORDER BY s2.started_at DESC
                 LIMIT 1
@@ -75,7 +76,7 @@ def init_db(conn: sqlite3.Connection) -> None:
         FROM games g
         JOIN sessions s ON s.game_id = g.id
         WHERE s.ended_at IS NOT NULL
-        GROUP BY COALESCE(g.canonical_name, g.file_path)
+        GROUP BY COALESCE(g.canonical_name, g.file_path), COALESCE(g.platform, '')
         ORDER BY total_seconds DESC;
     """)
     conn.commit()
@@ -267,6 +268,7 @@ def get_game_detail(conn: sqlite3.Connection, game_id: int) -> dict | None:
         return None
 
     group_key = game["canonical_name"] or game["file_path"]
+    platform_key = game["platform"] or ""
 
     summary = conn.execute(
         """
@@ -280,8 +282,9 @@ def get_game_detail(conn: sqlite3.Connection, game_id: int) -> dict | None:
         JOIN games g ON g.id = s.game_id
         WHERE s.ended_at IS NOT NULL
           AND COALESCE(g.canonical_name, g.file_path) = ?
+          AND COALESCE(g.platform, '') = ?
         """,
-        (group_key,),
+        (group_key, platform_key),
     ).fetchone()
 
     longest_row = conn.execute(
@@ -292,10 +295,11 @@ def get_game_detail(conn: sqlite3.Connection, game_id: int) -> dict | None:
         WHERE s.ended_at IS NOT NULL
           AND s.duration_s IS NOT NULL
           AND COALESCE(g.canonical_name, g.file_path) = ?
+          AND COALESCE(g.platform, '') = ?
         ORDER BY s.duration_s DESC
         LIMIT 1
         """,
-        (group_key,),
+        (group_key, platform_key),
     ).fetchone()
 
     best_day_row = conn.execute(
@@ -305,11 +309,12 @@ def get_game_detail(conn: sqlite3.Connection, game_id: int) -> dict | None:
         JOIN games g ON g.id = s.game_id
         WHERE s.ended_at IS NOT NULL
           AND COALESCE(g.canonical_name, g.file_path) = ?
+          AND COALESCE(g.platform, '') = ?
         GROUP BY DATE(s.started_at)
         ORDER BY total DESC
         LIMIT 1
         """,
-        (group_key,),
+        (group_key, platform_key),
     ).fetchone()
 
     sessions = conn.execute(
@@ -319,9 +324,10 @@ def get_game_detail(conn: sqlite3.Connection, game_id: int) -> dict | None:
         JOIN games g ON g.id = s.game_id
         WHERE s.ended_at IS NOT NULL
           AND COALESCE(g.canonical_name, g.file_path) = ?
+          AND COALESCE(g.platform, '') = ?
         ORDER BY s.started_at DESC
         """,
-        (group_key,),
+        (group_key, platform_key),
     ).fetchall()
 
     return {
@@ -352,7 +358,7 @@ def get_stats_summary(conn: sqlite3.Connection) -> dict:
     totals = conn.execute(
         """
         SELECT COALESCE(SUM(s.duration_s), 0) AS total_seconds,
-               COUNT(DISTINCT COALESCE(g.canonical_name, g.file_path)) AS total_games
+               COUNT(DISTINCT COALESCE(g.canonical_name, g.file_path) || '|' || COALESCE(g.platform, '')) AS total_games
         FROM sessions s
         JOIN games g ON g.id = s.game_id
         WHERE s.ended_at IS NOT NULL

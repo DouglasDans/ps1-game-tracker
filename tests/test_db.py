@@ -203,6 +203,26 @@ def test_get_games_aggregates_multi_track_playtime(conn):
     assert games[0]["session_count"] == 2
 
 
+def test_get_games_does_not_merge_same_title_different_platform(conn):
+    ps1_id = upsert_game(conn, "/roms/PS1/Gran Turismo.bin", "Gran Turismo", "PS1", "Gran Turismo")
+    psp_id = upsert_game(conn, "/roms/PSP/Gran Turismo.iso", "Gran Turismo", "PSP", "Gran Turismo")
+
+    s1 = open_session(conn, ps1_id, "duckstation")
+    close_session(conn, s1)
+    conn.execute("UPDATE sessions SET duration_s = 1000 WHERE id = ?", (s1,))
+
+    s2 = open_session(conn, psp_id, "ppsspp")
+    close_session(conn, s2)
+    conn.execute("UPDATE sessions SET duration_s = 2000 WHERE id = ?", (s2,))
+    conn.commit()
+
+    games = get_games(conn)
+    assert len(games) == 2
+    by_platform = {g["platform"]: g for g in games}
+    assert by_platform["PS1"]["total_seconds"] == 1000
+    assert by_platform["PSP"]["total_seconds"] == 2000
+
+
 def test_get_unenriched_games_returns_unenriched(conn):
     upsert_game(conn, "/roms/mgs.chd", "MGS", "PS1", "Metal Gear Solid")
     games = get_unenriched_games(conn)
@@ -352,6 +372,26 @@ def test_get_game_detail_aggregates_multi_track(conn):
     assert len(result["sessions"]) == 2
 
 
+def test_get_game_detail_does_not_include_other_platform_sessions(conn):
+    ps1_id = upsert_game(conn, "/roms/PS1/Gran Turismo.bin", "Gran Turismo", "PS1", "Gran Turismo")
+    psp_id = upsert_game(conn, "/roms/PSP/Gran Turismo.iso", "Gran Turismo", "PSP", "Gran Turismo")
+
+    s1 = open_session(conn, ps1_id, "duckstation")
+    close_session(conn, s1)
+    conn.execute("UPDATE sessions SET duration_s = 1000 WHERE id = ?", (s1,))
+
+    s2 = open_session(conn, psp_id, "ppsspp")
+    close_session(conn, s2)
+    conn.execute("UPDATE sessions SET duration_s = 2000 WHERE id = ?", (s2,))
+    conn.commit()
+
+    result = get_game_detail(conn, ps1_id)
+    assert result["total_seconds"] == 1000
+    assert result["session_count"] == 1
+    assert len(result["sessions"]) == 1
+    assert result["sessions"][0]["source"] == "duckstation"
+
+
 def test_get_game_detail_sessions_ordered_newest_first(conn):
     game_id = upsert_game(conn, "/roms/mgs.chd", "MGS", "PS1", "MGS")
 
@@ -498,6 +538,22 @@ def test_get_stats_summary_total_seconds(conn):
 
     result = get_stats_summary(conn)
     assert result["total_seconds"] == 3000
+    assert result["total_games"] == 2
+
+
+def test_get_stats_summary_total_games_counts_same_title_different_platform_separately(conn):
+    ps1_id = upsert_game(conn, "/roms/PS1/Gran Turismo.bin", "Gran Turismo", "PS1", "Gran Turismo")
+    psp_id = upsert_game(conn, "/roms/PSP/Gran Turismo.iso", "Gran Turismo", "PSP", "Gran Turismo")
+
+    s1 = open_session(conn, ps1_id, "duckstation")
+    close_session(conn, s1)
+    conn.execute("UPDATE sessions SET duration_s = 1000 WHERE id = ?", (s1,))
+    s2 = open_session(conn, psp_id, "ppsspp")
+    close_session(conn, s2)
+    conn.execute("UPDATE sessions SET duration_s = 2000 WHERE id = ?", (s2,))
+    conn.commit()
+
+    result = get_stats_summary(conn)
     assert result["total_games"] == 2
 
 
