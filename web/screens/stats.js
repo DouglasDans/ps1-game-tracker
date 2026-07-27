@@ -1,5 +1,5 @@
 import { fetchGames, fetchStats, fetchActivity } from '../data/api.js';
-import { fmtTime, fmtDate, cardGradient, platformLogoImg } from '../utils.js';
+import { fmtTime, cardGradient, platformLogoImg } from '../utils.js';
 
 const TABS = [
   { key: 'overview', label: 'Visão geral' },
@@ -19,7 +19,7 @@ export function mount(container, navigate, params = {}) {
       if (cancelled) return;
 
       const content = {
-        overview: buildOverview(stats, games, activity),
+        overview: buildOverview(stats, games),
         activity: buildActivity(activity),
         library: buildLibraryTab(stats, games),
       };
@@ -98,9 +98,9 @@ const DAY_PERIODS = [
   { label: 'Noite', icon: '🌆', from: 18, to: 23 },
 ];
 
-function panel(title, body) {
+function panel(title, body, sub) {
   return `<div class="stat-panel">
-    <div class="section-header">${title}</div>
+    <div class="section-header">${title}${sub ? `<span class="section-header-sub">${sub}</span>` : ''}</div>
     ${body}
   </div>`;
 }
@@ -115,19 +115,20 @@ function barRow(label, total_seconds, pct) {
   </div>`;
 }
 
-function buildOverview(s, games, activity) {
+function buildOverview(s, games) {
   const topGames = [...games].sort((a, b) => b.total_seconds - a.total_seconds).slice(0, 8);
+  const maxTop = topGames[0]?.total_seconds || 1;
   const topList = topGames.map((g, i) => {
     const cover = g.cover_url ? `<img src="${g.cover_url}" alt="" class="cover-img">` : '';
-    const pct = s.total_seconds ? Math.round((g.total_seconds / s.total_seconds) * 100) : 0;
+    const pct = Math.max(4, Math.round((g.total_seconds / maxTop) * 100));
     return `<div class="top-game-row">
       <span class="top-game-rank">${i + 1}</span>
       <div class="top-game-cover" style="background:${cardGradient(g.display_name)}">${cover}</div>
       <div class="top-game-info">
         <div class="top-game-name">${g.display_name}</div>
-        <div class="top-game-meta">${g.platform ?? ''} · ${g.session_count} sessões</div>
+        <div class="top-game-bar"><div class="top-game-bar-fill" style="width:${pct}%"></div></div>
       </div>
-      <div class="top-game-time">${fmtTime(g.total_seconds)}<div class="top-game-pct">${pct}%</div></div>
+      <div class="top-game-time">${fmtTime(g.total_seconds)}</div>
     </div>`;
   }).join('');
 
@@ -139,19 +140,19 @@ function buildOverview(s, games, activity) {
         <div class="stats-card-sub">em todas as plataformas</div>
       </div>
       <div class="stats-card">
-        <div class="stats-card-label">Jogos jogados</div>
+        <div class="stats-card-label">Jogos</div>
         <div class="stats-card-value">${s.total_games}</div>
         <div class="stats-card-sub">com pelo menos 1 sessão</div>
       </div>
       <div class="stats-card">
-        <div class="stats-card-label">Sessão mais longa</div>
-        <div class="stats-card-value">${fmtTime(s.longest_session?.duration_s)}</div>
-        <div class="stats-card-sub">${s.longest_session?.display_name ?? '—'} · ${fmtDate(s.longest_session?.started_at)}</div>
+        <div class="stats-card-label">Sessões</div>
+        <div class="stats-card-value">${s.total_sessions ?? 0}</div>
+        <div class="stats-card-sub">sessões encerradas</div>
       </div>
       <div class="stats-card">
-        <div class="stats-card-label">Sequência</div>
-        <div class="stats-card-value">${activity?.current_streak ?? 0}d</div>
-        <div class="stats-card-sub">recorde: ${activity?.longest_streak ?? 0} dias seguidos</div>
+        <div class="stats-card-label">Dias jogados</div>
+        <div class="stats-card-value">${s.total_days_played ?? 0}</div>
+        <div class="stats-card-sub">dias distintos com sessão</div>
       </div>
     </div>
 
@@ -186,7 +187,15 @@ function buildActivity(activity) {
       <div class="period-sub">${periodGrand ? Math.round((p.total / periodGrand) * 100) : 0}% do total</div>
     </div>`).join('');
 
+  const byDay = activity?.by_day ?? [];
+  const maxDay = Math.max(...byDay.map(d => d.total_seconds), 1);
+  const heatCells = byDay.map(d => {
+    const opacity = d.total_seconds ? (0.12 + (d.total_seconds / maxDay) * 0.65).toFixed(2) : 0.05;
+    return `<div class="heatmap-cell" style="background:rgba(255,255,255,${opacity})" title="${d.date}"></div>`;
+  }).join('');
+
   return `
+    ${panel('Atividade', `<div class="heatmap-grid">${heatCells}</div>`, 'ÚLTIMAS 13 SEMANAS')}
     ${panel('Dia da semana', `<div class="weekday-chart">${weekdayCols}</div>`)}
     ${panel('Período do dia', `<div class="period-cards period-cards-row">${periodCards}</div>`)}`;
 }

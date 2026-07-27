@@ -560,10 +560,18 @@ body {
   text-overflow: ellipsis;
 }
 
-.top-game-meta {
-  font-size: 0.78rem;
-  color: var(--text-muted);
-  margin-top: 2px;
+.top-game-bar {
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.09);
+  overflow: hidden;
+  margin-top: 6px;
+}
+
+.top-game-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.55);
 }
 
 .top-game-time {
@@ -573,13 +581,6 @@ body {
   font-variant-numeric: tabular-nums;
   flex-shrink: 0;
   text-align: right;
-}
-
-.top-game-pct {
-  font-size: 0.72rem;
-  font-weight: 500;
-  color: var(--text-muted);
-  margin-top: 2px;
 }
 
 .hero {
