@@ -50,6 +50,16 @@ export function fmtDateShort(iso) {
   return new Date(s).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
 }
 
+export function localDateKey(iso) {
+  if (!iso) return null;
+  const s = iso.includes('Z') ? iso : iso + 'Z';
+  const d = new Date(s);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
 export function fmtSource(src) {
   return SOURCE_LABEL[src] || src || '—';
 }

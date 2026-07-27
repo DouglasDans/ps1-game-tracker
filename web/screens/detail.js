@@ -1,5 +1,5 @@
 import { fetchGameDetail } from '../data/api.js';
-import { fmtTime, fmtDate, fmtDateShort, fmtSource, cardGradient, getPlatformLogo, extractDominantColor } from '../utils.js';
+import { fmtTime, fmtDate, fmtDateShort, fmtSource, cardGradient, getPlatformLogo, extractDominantColor, localDateKey } from '../utils.js';
 
 const SCROLL_STEP = 240;
 
@@ -237,7 +237,7 @@ function fmtDayDate(dateStr) {
 
 function countUniqueDays(sessions) {
   if (!sessions?.length) return '—';
-  const days = new Set(sessions.map(s => s.started_at?.slice(0, 10)));
+  const days = new Set(sessions.map(s => localDateKey(s.started_at)));
   return days.size;
 }
 
