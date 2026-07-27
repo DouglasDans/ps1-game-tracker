@@ -6,6 +6,33 @@
   padding: 0;
 }
 
+/* Vendored locally (not Google Fonts CDN) — the PS1 Pro runs fully offline
+   by design, same reason SQLite (not a remote API) is the source of truth.
+   Subset covers only the icon names actually used in the UI. */
+@font-face {
+  font-family: "Material Symbols Rounded";
+  font-style: normal;
+  font-weight: 400;
+  src: url("/assets/fonts/material-symbols-rounded-subset.woff2") format("woff2");
+}
+
+.msr {
+  font-family: "Material Symbols Rounded";
+  font-weight: normal;
+  font-style: normal;
+  font-size: inherit;
+  line-height: 1;
+  letter-spacing: normal;
+  text-transform: none;
+  display: inline-block;
+  white-space: nowrap;
+  word-wrap: normal;
+  direction: ltr;
+  -webkit-font-feature-settings: "liga";
+  font-feature-settings: "liga";
+  -webkit-font-smoothing: antialiased;
+}
+
 :root {
   --bg: #0d0d1a;
   --bg-raised: #13132a;
@@ -178,23 +205,33 @@ body {
 .status-item {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   font-size: 0.8rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--text-muted);
 }
 
-.status-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
+.status-item .msr {
+  font-size: 1.1rem;
 }
-.status-dot.network {
-  background: #3ddc84;
+
+.status-item.controller {
+  padding: 5px 14px;
+  border-radius: 999px;
+  background: rgba(120, 220, 150, 0.1);
+  border: 1px solid rgba(120, 220, 150, 0.25);
+  color: #8fe3a8;
+  transition:
+    opacity 0.15s,
+    background 0.15s,
+    border-color 0.15s;
 }
-.status-dot.controller {
-  background: var(--accent);
+
+.status-item.controller.disconnected {
+  background: transparent;
+  border-color: rgba(255, 255, 255, 0.12);
+  color: var(--text-muted);
 }
 
 /* ── Screen: Home ── */

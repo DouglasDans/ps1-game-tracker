@@ -137,15 +137,11 @@ function initGamepad() {
 }
 
 function updateControllerStatus(connected, id = '') {
-  const dot  = document.querySelector('.status-dot.controller');
+  const item = document.querySelector('.status-item.controller');
   const text = document.querySelector('.status-controller-text');
-  if (!dot || !text) return;
-  dot.style.opacity = connected ? '1' : '0.3';
-  if (connected) {
-    text.textContent = id.trim() || 'Controle conectado';
-  } else {
-    text.textContent = 'Sem controle';
-  }
+  if (!item || !text) return;
+  item.classList.toggle('disconnected', !connected);
+  text.textContent = connected ? (id.trim() || 'Controle conectado') : 'Sem controle';
 }
 
 function init() {
@@ -155,9 +151,9 @@ function init() {
         <img src="/assets/psone-pro.svg" alt="PS one Pro">
       </div>
       <nav class="top-nav">
-        <span class="nav-item active" data-screen="home">Games</span>
-        <span class="nav-item" data-screen="stats">Stats</span>
-        <span class="nav-item" data-screen="settings">Settings</span>
+        <span class="nav-item active" data-screen="home"><span class="msr">sports_esports</span>Games</span>
+        <span class="nav-item" data-screen="stats"><span class="msr">bar_chart</span>Stats</span>
+        <span class="nav-item" data-screen="settings"><span class="msr">settings</span>Settings</span>
       </nav>
       <span class="top-clock" id="clock"></span>
     </header>
@@ -168,11 +164,11 @@ function init() {
       <div class="bottom-hints" id="bottom-hints"></div>
       <div class="bottom-status">
         <span class="status-item">
-          <span class="status-dot network"></span>
+          <span class="msr">wifi</span>
           ${API_HOST}
         </span>
-        <span class="status-item">
-          <span class="status-dot controller"></span>
+        <span class="status-item controller disconnected">
+          <span class="msr">stadia_controller</span>
           <span class="status-controller-text">Sem controle</span>
         </span>
       </div>
