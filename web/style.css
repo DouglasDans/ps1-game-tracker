@@ -107,14 +107,28 @@ body {
   font-family: var(--font-mono);
 }
 
+/* ── Fixed 1920×1080 design canvas, scaled to fit whatever the real
+   screen is (Pi TV output, a dev monitor, 4K, 1366×768 — anything) —
+   see fitViewport() in app.js. Every px value in this stylesheet assumes
+   the 1920×1080 canvas; scaling the canvas itself keeps every proportion
+   identical instead of reflowing at other resolutions. ── */
+#viewport {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 1920px;
+  height: 1080px;
+  transform-origin: 0 0;
+}
+
 /* ── Root layout ── */
 #root {
   position: relative;
   z-index: 0;
   display: grid;
   grid-template-rows: var(--top-h) 1fr var(--bot-h);
-  height: 100vh;
-  width: 100vw;
+  height: 100%;
+  width: 100%;
   overflow: hidden;
 }
 

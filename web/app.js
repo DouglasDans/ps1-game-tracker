@@ -200,6 +200,19 @@ function updateControllerStatus(connected) {
   text.textContent = connected ? 'CONTROLE 1' : 'Sem controle';
 }
 
+// Scales the fixed 1920×1080 #viewport to fit whatever the real screen is
+// (any resolution/aspect ratio), centered and letterboxed if needed, so the
+// px-based layout never reflows — only the CSS values assuming 1920×1080
+// stay meaningful.
+function fitViewport() {
+  const viewport = document.getElementById('viewport');
+  if (!viewport) return;
+  const scale = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+  const left = (window.innerWidth - 1920 * scale) / 2;
+  const top = (window.innerHeight - 1080 * scale) / 2;
+  viewport.style.transform = `translate(${left}px, ${top}px) scale(${scale})`;
+}
+
 function init() {
   document.getElementById('root').innerHTML = `
     <div class="screen-backdrop" id="screen-backdrop"></div>
@@ -221,6 +234,9 @@ function init() {
         </span>
       </div>
     </footer>`;
+
+  fitViewport();
+  window.addEventListener('resize', fitViewport);
 
   setInterval(updateClock, 1000);
   initGamepad();
