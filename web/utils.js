@@ -11,6 +11,7 @@ const PLATFORM_LOGO = {
   'Sega CD': '/assets/scd.svg',
   'Mega-CD': '/assets/scd.svg',
   MegaCD: '/assets/scd.svg',
+  N64: '/assets/n64.png',
 };
 
 const SEGA_PLATFORMS = new Set([
