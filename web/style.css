@@ -347,12 +347,17 @@ body {
   border-radius: 50%;
   filter: blur(90px);
   opacity: 0;
-  transition: background 0.7s ease;
+  transition:
+    opacity 0.5s ease,
+    background 0.7s ease;
   pointer-events: none;
 }
 
+/* Static instead of a looping pulse — a blurred 900px layer recomposited
+   every frame, forever, was a measurable CPU drain on the Pi's Chromium
+   for a barely-perceptible "breathing" effect. */
 .home-glow-blob.visible {
-  animation: home-glow-pulse 9s ease-in-out infinite;
+  opacity: 0.55;
 }
 
 .library-backdrop,
@@ -368,16 +373,6 @@ body {
 
 .stats-backdrop {
   background: radial-gradient(70% 50% at 80% 0%, rgba(120, 110, 255, 0.16), transparent 70%);
-}
-
-@keyframes home-glow-pulse {
-  0%,
-  100% {
-    opacity: 0.35;
-  }
-  50% {
-    opacity: 0.75;
-  }
 }
 
 .stats-summary-cards {
