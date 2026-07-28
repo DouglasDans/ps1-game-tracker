@@ -16,11 +16,25 @@ const TOP_PAGES = ['home', 'stats'];
 // Wraps a screen swap in the native View Transitions API so navigation
 // gets a default crossfade for free; 'detail-open'/'detail-close' additionally
 // get a custom slide via the CSS in style.css keyed off data-transition.
+let activeTransition = null;
+
 function withViewTransition(updateDOM, kind) {
   if (!document.startViewTransition) { updateDOM(); return; }
+  // Held-button repeat (gamepad) or fast key-repeat can fire navigate() again
+  // before the previous transition (0.3s) finishes — starting a new one while
+  // one is in flight throws InvalidStateError and leaves a torn/frozen frame.
+  // skipTransition() snaps the old one to its end state instantly instead.
+  if (activeTransition) activeTransition.skipTransition();
+
   document.documentElement.dataset.transition = kind || '';
   const transition = document.startViewTransition(updateDOM);
-  transition.finished.finally(() => { delete document.documentElement.dataset.transition; });
+  activeTransition = transition;
+  // skipTransition() above rejects `finished` with AbortError by design —
+  // catch it here so it doesn't surface as an unhandled rejection.
+  transition.finished.catch(() => {}).finally(() => {
+    delete document.documentElement.dataset.transition;
+    if (activeTransition === transition) activeTransition = null;
+  });
 }
 
 export function navigate(screen, params = {}) {
@@ -33,7 +47,7 @@ export function navigate(screen, params = {}) {
     currentScreen = screen;
     const main = document.getElementById('main');
     currentCleanup = SCREENS[screen](main, navigate, params) ?? null;
-    updateNav(screen);
+    renderHeader(screen, params);
     updateHints(screen);
   }, kind);
 }
@@ -48,21 +62,63 @@ function initPageSwitcher() {
   });
 }
 
-function updateNav(screen) {
-  document.querySelectorAll('.nav-item').forEach(el => {
-    el.classList.toggle('active', el.dataset.screen === screen);
-  });
+// Detail replaces the global nav with its own minimal header (logo + back
+// link), matching the mock — Library/Detail's back target is computed the
+// same way detail.js computes it internally for its own Escape/Backspace handling.
+function detailBackTarget(params) {
+  const back = params.from ?? 'home';
+  const backParams = params.from === 'library'
+    ? { selectedIndex: params.libraryIndex, platformFilter: params.libraryFilter }
+    : {};
+  return { back, backParams };
+}
+
+function renderHeader(screen, params) {
+  const topBar = document.querySelector('.top-bar');
+  if (!topBar) return;
+
+  if (screen === 'detail') {
+    topBar.innerHTML = `
+      <div class="top-logo">
+        <img src="/assets/psone-pro.svg" alt="PS one Pro">
+      </div>
+      <div class="top-back" id="top-back">↑ VOLTAR AOS JOGOS</div>
+      <span class="top-clock" id="clock"></span>`;
+    const { back, backParams } = detailBackTarget(params);
+    document.getElementById('top-back')?.addEventListener('click', () => navigate(back, backParams));
+  } else {
+    const activeScreen = screen === 'library' ? 'home' : screen;
+    topBar.innerHTML = `
+      <div class="top-logo">
+        <img src="/assets/psone-pro.svg" alt="PS one Pro">
+      </div>
+      <nav class="top-nav">
+        <span class="nav-item${activeScreen === 'home' ? ' active' : ''}" data-screen="home"><span class="msr">sports_esports</span>Jogos</span>
+        <span class="nav-item${activeScreen === 'stats' ? ' active' : ''}" data-screen="stats"><span class="msr">bar_chart</span>Estatísticas</span>
+        <span class="nav-item" data-screen="settings"><span class="msr">settings</span>Ajustes</span>
+      </nav>
+      <span class="top-clock" id="clock"></span>`;
+    document.querySelectorAll('.nav-item').forEach(el => {
+      el.addEventListener('click', () => {
+        const target = el.dataset.screen;
+        if (target === 'settings') return;
+        navigate(target);
+      });
+    });
+  }
+  updateClock();
 }
 
 const SCREEN_HINTS = {
   home: `
     <span class="hint"><span class="hint-btn">✕</span><span class="hint-btn">↓</span> Detalhes</span>
-    <span class="hint"><span class="hint-btn">□</span> Library</span>
-    <span class="hint"><span class="hint-btn hint-btn-wide">R1</span> Stats</span>`,
+    <span class="hint"><span class="hint-btn">△</span> Biblioteca</span>
+    <span class="hint"><span class="hint-btn hint-btn-wide">R1</span> Estatísticas</span>`,
   stats: `
     <span class="hint"><span class="hint-btn">○</span> Voltar</span>
-    <span class="hint"><span class="hint-btn hint-btn-wide">L1</span> Games</span>
-    <span class="hint"><span class="hint-btn">↑</span><span class="hint-btn">↓</span> Abas</span>`,
+    <span class="hint"><span class="hint-btn hint-btn-wide">L1</span> Jogos</span>
+    <span class="hint"><span class="hint-btn">↑</span><span class="hint-btn">↓</span> Abas</span>
+    <span class="hint"><span class="hint-btn">→</span> Rolar conteúdo</span>`,
   library: `
     <span class="hint"><span class="hint-btn">✕</span> Selecionar</span>
     <span class="hint"><span class="hint-btn">○</span> Voltar</span>
@@ -100,7 +156,7 @@ function initGamepad() {
       const map = [
         { btn: 0,  key: 'Enter' },
         { btn: 1,  key: 'Escape' },
-        { btn: 2,  key: 'Square' },
+        { btn: 3,  key: 'Triangle' },
         { btn: 4,  key: 'L1' },
         { btn: 5,  key: 'R1' },
         { btn: 12, key: 'ArrowUp' },
@@ -130,33 +186,25 @@ function initGamepad() {
   }
 
   window.addEventListener('gamepadconnected', (e) => {
-    updateControllerStatus(true, e.gamepad.id);
+    updateControllerStatus(true);
     requestAnimationFrame(pollGamepad);
   });
   window.addEventListener('gamepaddisconnected', () => updateControllerStatus(false));
 }
 
-function updateControllerStatus(connected, id = '') {
+function updateControllerStatus(connected) {
   const item = document.querySelector('.status-item.controller');
   const text = document.querySelector('.status-controller-text');
   if (!item || !text) return;
   item.classList.toggle('disconnected', !connected);
-  text.textContent = connected ? (id.trim() || 'Controle conectado') : 'Sem controle';
+  text.textContent = connected ? 'CONTROLE 1' : 'Sem controle';
 }
 
 function init() {
   document.getElementById('root').innerHTML = `
-    <header class="top-bar">
-      <div class="top-logo">
-        <img src="/assets/psone-pro.svg" alt="PS one Pro">
-      </div>
-      <nav class="top-nav">
-        <span class="nav-item active" data-screen="home"><span class="msr">sports_esports</span>Games</span>
-        <span class="nav-item" data-screen="stats"><span class="msr">bar_chart</span>Stats</span>
-        <span class="nav-item" data-screen="settings"><span class="msr">settings</span>Settings</span>
-      </nav>
-      <span class="top-clock" id="clock"></span>
-    </header>
+    <div class="screen-backdrop" id="screen-backdrop"></div>
+
+    <header class="top-bar"></header>
 
     <main id="main"></main>
 
@@ -174,15 +222,6 @@ function init() {
       </div>
     </footer>`;
 
-  document.querySelectorAll('.nav-item').forEach(el => {
-    el.addEventListener('click', () => {
-      const screen = el.dataset.screen;
-      if (screen === 'settings') return;
-      navigate(screen);
-    });
-  });
-
-  updateClock();
   setInterval(updateClock, 1000);
   initGamepad();
   initPageSwitcher();

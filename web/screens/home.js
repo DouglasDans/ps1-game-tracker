@@ -1,5 +1,5 @@
 import { fetchGames, fetchActiveSession } from '../data/api.js';
-import { fmtTime, fmtDateShort, fmtSource, cardGradient, hueGradient, hueOf, hueOfName, platformLogoImg, extractDominantColor } from '../utils.js';
+import { fmtTime, fmtDateShort, fmtSource, cardGradient, hueOf, hueOfName, platformLogoImg, extractDominantColor, glowCGradient, artBGradient } from '../utils.js';
 
 const CARD_W         = 132;
 const CARD_GAP       = 18;
@@ -38,7 +38,7 @@ export function mount(container, navigate, params = {}) {
           case 'ArrowRight':
             if (selectedIndex < items.length - 1) { selectedIndex++; refresh(items, selectedIndex, active, games); }
             break;
-          case 'Square':
+          case 'Triangle':
             e.preventDefault();
             navigate('library');
             break;
@@ -116,17 +116,19 @@ function buildHTML(items, selectedIndex, active) {
     const isActive = active && item.id === active.game_id;
     const cover = item.cover_url
       ? `<img src="${item.cover_url}" alt="" class="cover-img">`
-      : `<div class="cover-gradient" style="background:${cardGradient(item.display_name)}"></div>`;
+      : `<div class="cover-gradient" style="background:${cardGradient(item.display_name)}"></div>
+         <div class="card-title-overlay"><span>${item.display_name}</span></div>`;
     return `<div class="game-card${sel}${isActive ? ' has-active' : ''}" data-idx="${i}" data-id="${item.id}">
       ${cover}
-      <div class="card-title-overlay"><span>${item.display_name}</span></div>
       <div class="card-active-dot"></div>
     </div>`;
   }).join('');
 
   return `<div class="screen-home">
     <div class="section-home" id="section-home">
-      <div class="home-backdrop" id="home-backdrop"></div>
+      <div class="game-row-wrapper">
+        <div class="game-row" id="game-row">${cards}</div>
+      </div>
       <div class="hero">
         <div class="hero-info">
           <div class="hero-meta">
@@ -166,18 +168,38 @@ function buildHTML(items, selectedIndex, active) {
           </div>
         </div>
       </div>
-      <div class="game-row-wrapper">
-        <div class="game-row" id="game-row">${cards}</div>
-      </div>
     </div>
   </div>`;
 }
 
 let _backdropToken = 0;
 
-function setBackdropGradient(el, baseGradient) {
-  el.style.background =
-    `linear-gradient(180deg, rgba(13, 13, 26, 0.55) 0%, rgba(13, 13, 26, 0.85) 55%, var(--bg) 85%), ${baseGradient}`;
+// Backdrop lives in the global #screen-backdrop layer (behind the
+// transparent header/footer, see style.css) rather than inside .section-home,
+// so the glow can bleed under the chrome the same way it does in the mock.
+function ensureBackdropLayers() {
+  const root = document.getElementById('screen-backdrop');
+  if (!root) return null;
+  if (!root.querySelector('.home-backdrop')) {
+    root.innerHTML = `
+      <div class="home-backdrop" id="home-backdrop"></div>
+      <div class="home-vignette"></div>
+      <div class="home-glow-blob" id="home-glow-blob"></div>`;
+  }
+  return root;
+}
+
+function setBackdropGradient(hue) {
+  const el = document.getElementById('home-backdrop');
+  if (!el) return;
+  el.style.background = glowCGradient(hue);
+  el.classList.add('visible');
+}
+
+function setGlowBlob(hue) {
+  const el = document.getElementById('home-glow-blob');
+  if (!el) return;
+  el.style.background = artBGradient(hue);
   el.classList.add('visible');
 }
 
@@ -187,23 +209,27 @@ function setAccentGame(hue) {
 }
 
 function updateBackdrop(item) {
-  const el = document.getElementById('home-backdrop');
-  if (!el) return;
   const token = ++_backdropToken;
 
   if (item._lib) {
-    el.classList.remove('visible');
+    const root = document.getElementById('screen-backdrop');
+    if (root) root.innerHTML = '';
     return;
   }
+  ensureBackdropLayers();
   if (!item.cover_url) {
-    setBackdropGradient(el, cardGradient(item.display_name));
-    setAccentGame(hueOfName(item.display_name));
+    const hue = hueOfName(item.display_name);
+    setBackdropGradient(hue);
+    setGlowBlob(hue);
+    setAccentGame(hue);
     return;
   }
   extractDominantColor(item.cover_url).then(c => {
-    if (!c || token !== _backdropToken || !el.isConnected) return;
+    const el = document.getElementById('home-backdrop');
+    if (!c || token !== _backdropToken || !el?.isConnected) return;
     const hue = hueOf(c);
-    setBackdropGradient(el, hueGradient(hue));
+    setBackdropGradient(hue);
+    setGlowBlob(hue);
     setAccentGame(hue);
   });
 }

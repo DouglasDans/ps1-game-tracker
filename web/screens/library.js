@@ -29,6 +29,8 @@ export function mount(container, navigate, params = {}) {
   let cancelled = false;
 
   container.innerHTML = '<div style="padding:40px;color:var(--text-muted);text-align:center">Carregando...</div>';
+  const backdrop = document.getElementById('screen-backdrop');
+  if (backdrop) backdrop.innerHTML = '<div class="library-backdrop"></div>';
 
   fetchGames()
     .then(allGames => {
@@ -200,8 +202,10 @@ function buildHTML(platforms, games, selectedIndex, platformFilter, sortIndex) {
 
   return `<div class="screen-library">
     <aside class="side-rail">
+      <div class="rail-group-label">PLATAFORMA</div>
       ${railItems}
       <div class="rail-separator"></div>
+      <div class="rail-group-label">ORDENAR</div>
       <div class="rail-item rail-sort"><span class="msr">swap_vert</span>Ordenar: ${SORT_MODES[sortIndex].label}</div>
     </aside>
     <div class="library-main">
@@ -218,11 +222,11 @@ function gridHTML(games, selectedIndex) {
   return games.map((g, i) => {
     const cover = g.cover_url
       ? `<img src="${g.cover_url}" alt="" class="cover-img">`
-      : `<div class="cover-gradient" style="background:${cardGradient(g.display_name)}"></div>`;
+      : `<div class="cover-gradient" style="background:${cardGradient(g.display_name)}"></div>
+         <div class="card-title-overlay"><span>${g.display_name}</span></div>`;
     return `<div class="lib-card${i === selectedIndex ? ' selected' : ''}" data-id="${g.id}">
       <div class="lib-card-cover">
         ${cover}
-        <div class="card-title-overlay"><span>${g.display_name}</span></div>
       </div>
       <div class="lib-card-name">${g.display_name}</div>
       <div class="lib-card-time"><span class="msr">schedule</span>${fmtTime(g.total_seconds)}</div>

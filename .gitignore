@@ -12,3 +12,4 @@ config.toml
 *.db-wal
 .env
 systemd/ps1-tracker.service
+ps1-pro-tv-interface-design/

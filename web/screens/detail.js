@@ -1,5 +1,5 @@
 import { fetchGameDetail } from '../data/api.js';
-import { fmtTime, fmtDate, fmtDateShort, fmtSource, cardGradient, getPlatformLogo, extractDominantColor, localDateKey, localHour, localWeekdayMon0, hueOf, hueOfName } from '../utils.js';
+import { fmtTime, fmtDate, fmtDateShort, fmtSource, cardGradient, getPlatformLogo, extractDominantColor, localDateKey, localHour, localWeekdayMon0, hueOf, hueOfName, glowCGradient } from '../utils.js';
 
 const SCROLL_STEP = 240;
 const HEATMAP_DAYS = 91;
@@ -19,6 +19,8 @@ export function mount(container, navigate, params = {}) {
   let cancelled = false;
 
   container.innerHTML = '<div style="padding:40px;color:var(--text-muted);text-align:center">Carregando...</div>';
+  const globalBackdrop = document.getElementById('screen-backdrop');
+  if (globalBackdrop) globalBackdrop.innerHTML = '';
 
   const back = params.from ?? 'home';
   const backParams = params.from === 'library'
@@ -37,7 +39,6 @@ export function mount(container, navigate, params = {}) {
 
       container.innerHTML = buildHTML(detail, content[TABS[tabIndex].key], tabIndex);
       applyBackdrop(container, detail);
-      container.querySelector('.detail-back')?.addEventListener('click', () => navigate(back, backParams));
 
       function refreshRail() {
         container.querySelectorAll('.detail-rail .rail-item').forEach((el, i) => {
@@ -64,7 +65,13 @@ export function mount(container, navigate, params = {}) {
 
         if (focus === 'rail') {
           if (e.key === 'ArrowDown') { e.preventDefault(); if (tabIndex < TABS.length - 1) setTab(tabIndex + 1); }
-          if (e.key === 'ArrowUp')   { e.preventDefault(); if (tabIndex > 0) setTab(tabIndex - 1); }
+          if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            // Header reads "↑ VOLTAR AOS JOGOS" — pressing up past the first
+            // section exits Detail, matching that affordance.
+            if (tabIndex > 0) setTab(tabIndex - 1);
+            else navigate(back, backParams);
+          }
           if (e.key === 'ArrowRight') { focus = 'content'; refreshRail(); }
           return;
         }
@@ -82,7 +89,6 @@ export function mount(container, navigate, params = {}) {
     .catch(err => {
       if (cancelled) return;
       container.innerHTML = err.message.includes('404') ? buildNotFound() : buildError(err.message);
-      container.querySelector('.detail-back')?.addEventListener('click', () => navigate(back, backParams));
       function onKey(e) {
         if (e.key === 'Escape' || e.key === 'Backspace') navigate(back, backParams);
       }
@@ -96,22 +102,29 @@ export function mount(container, navigate, params = {}) {
   };
 }
 
+// Matches the mock's Estado 2/3 treatment: glowC wash at .5 opacity plus a
+// static vignette fading to solid bg by 40% down — same glowC formula as
+// Home's backdrop (shared via utils.glowCGradient), not an invented one.
 function applyBackdrop(container, d) {
-  const el = container.querySelector('.detail-backdrop');
-  if (!el) return;
+  const root = document.getElementById('screen-backdrop');
+  if (!root) return;
+  root.innerHTML = `
+    <div class="detail-backdrop" id="detail-backdrop"></div>
+    <div class="detail-vignette"></div>`;
+  const el = document.getElementById('detail-backdrop');
   if (!d.cover_url) {
-    el.style.background =
-      `linear-gradient(180deg, rgba(13, 13, 26, 0.5) 0%, rgba(13, 13, 26, 0.8) 45%, var(--bg) 80%), ${cardGradient(d.display_name)}`;
+    const hue = hueOfName(d.display_name);
+    el.style.background = glowCGradient(hue);
     el.classList.add('visible');
-    container.querySelector('.screen-detail')?.style.setProperty('--accent-game', `hsl(${hueOfName(d.display_name)}, 70%, 66%)`);
+    container.querySelector('.screen-detail')?.style.setProperty('--accent-game', `hsl(${hue}, 70%, 66%)`);
     return;
   }
   extractDominantColor(d.cover_url).then(c => {
     if (!c || !el.isConnected) return;
-    el.style.background =
-      `linear-gradient(170deg, rgba(${c}, 0.55) 0%, rgba(${c}, 0.18) 45%, transparent 75%)`;
+    const hue = hueOf(c);
+    el.style.background = glowCGradient(hue);
     el.classList.add('visible');
-    container.querySelector('.screen-detail')?.style.setProperty('--accent-game', `hsl(${hueOf(c)}, 70%, 66%)`);
+    container.querySelector('.screen-detail')?.style.setProperty('--accent-game', `hsl(${hue}, 70%, 66%)`);
   });
 }
 
@@ -127,21 +140,9 @@ function buildHTML(d, tabContent, tabIndex) {
     `<div class="rail-item${i === tabIndex ? ' active' : ''}" data-tab="${t.key}">${t.label}</div>`
   ).join('');
 
-  const meta = [logo ? null : d.platform, d.release_year, d.genre, d.developer]
-    .filter(Boolean).join(' · ');
+  const meta = [logo ? null : d.platform, d.genre].filter(Boolean).join(' · ');
 
   return `<div class="screen-detail">
-    <div class="detail-backdrop"></div>
-
-    <div class="detail-topbar">
-      <div class="detail-back">
-        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M10 3L5 8l5 5"/>
-        </svg>
-        Voltar
-      </div>
-    </div>
-
     <div class="detail-body">
       <aside class="detail-side">
         <div class="detail-cover"><div class="detail-cover-inner">${cover}</div></div>
@@ -154,25 +155,6 @@ function buildHTML(d, tabContent, tabIndex) {
           <span class="detail-meta-text">${meta}</span>
         </div>
         <h1 class="detail-title">${d.display_name}</h1>
-
-        <div class="detail-hero-stats">
-          <div class="detail-hero-stat">
-            <div class="stat-value-xl">${fmtTime(d.total_seconds)}</div>
-            <div class="stat-label">Tempo total</div>
-          </div>
-          <div class="detail-hero-stat">
-            <div class="stat-value-lg">${d.session_count}</div>
-            <div class="stat-label">Sessões</div>
-          </div>
-          <div class="detail-hero-stat">
-            <div class="stat-value-lg">${fmtDateShort(d.last_played)}</div>
-            <div class="stat-label">Último acesso</div>
-          </div>
-          <div class="detail-hero-stat">
-            <div class="stat-value-lg">${d.sessions[0] ? fmtSource(d.sessions[0].source) : '—'}</div>
-            <div class="stat-label">Emulador</div>
-          </div>
-        </div>
 
         <div id="detail-tab-content" class="detail-tab-content">${tabContent}</div>
       </div>
@@ -192,17 +174,15 @@ function buildOverviewTab(d) {
       <div class="insight-card-value">${m.value}</div>
     </div>`).join('');
 
-  const insights = [
-    { label: 'Média por sessão', value: fmtTime(d.avg_session_s ? Math.round(d.avg_session_s) : null) },
-    { label: 'Sessão mais longa', value: fmtTime(d.longest_session_s), sub: d.longest_session_date ? fmtDayDate(d.longest_session_date) : null },
-    { label: 'Melhor dia', value: fmtDayDate(d.best_day), sub: d.best_day_total_s ? `${fmtTime(d.best_day_total_s)} jogados` : null },
+  const quickFacts = [
+    { label: 'Tempo total', value: fmtTime(d.total_seconds), accent: true },
     { label: 'Primeira vez', value: fmtDate(d.first_played) },
-    { label: 'Dias jogados', value: countUniqueDays(d.sessions) },
+    { label: 'Último acesso', value: fmtDateShort(d.last_played) },
+    { label: 'Emulador', value: d.sessions[0] ? fmtSource(d.sessions[0].source) : '—' },
   ].map(i => `
-    <div class="insight-card">
+    <div class="insight-card insight-card-lg${i.accent ? ' insight-card-accent' : ''}">
       <div class="insight-card-label">${i.label}</div>
       <div class="insight-card-value">${i.value}</div>
-      ${i.sub ? `<div class="insight-card-sub">${i.sub}</div>` : ''}
     </div>`).join('');
 
   return `
@@ -211,7 +191,7 @@ function buildOverviewTab(d) {
       <div class="detail-synopsis-head"><span>Sinopse</span><span class="detail-synopsis-source">Fonte: IGDB</span></div>
       <p class="detail-summary">${d.summary}</p>
     </div>` : ''}
-    <div class="insight-cards-loose">${insights}</div>`;
+    <div class="insight-cards-loose">${quickFacts}</div>`;
 }
 
 function dayKey(date) {
@@ -413,14 +393,12 @@ function countUniqueDays(sessions) {
 
 function buildNotFound() {
   return `<div class="screen-detail">
-    <div class="detail-topbar"><div class="detail-back">← Voltar</div></div>
     <p style="color:var(--text-muted);margin:40px var(--side-pad)">Jogo não encontrado.</p>
   </div>`;
 }
 
 function buildError(msg) {
   return `<div class="screen-detail">
-    <div class="detail-topbar"><div class="detail-back">← Voltar</div></div>
     <p style="color:var(--text-muted);margin:40px var(--side-pad)">Erro ao carregar jogo.<br><small>${msg}</small></p>
   </div>`;
 }

@@ -109,11 +109,24 @@ body {
 
 /* ── Root layout ── */
 #root {
+  position: relative;
+  z-index: 0;
   display: grid;
   grid-template-rows: var(--top-h) 1fr var(--bot-h);
   height: 100vh;
   width: 100vw;
   overflow: hidden;
+}
+
+/* Full-viewport layer sitting behind header/main/footer — each screen owns
+   its content here (Home's animated glow, Library/Stats' static washes) so
+   it can bleed under the transparent top/bottom bars, matching the mock. */
+.screen-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
 }
 
 /* ── Top bar ── */
@@ -122,7 +135,7 @@ body {
   align-items: center;
   padding: 0 var(--side-pad);
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-  background: var(--bg);
+  background: transparent;
   gap: 0;
   z-index: 10;
 }
@@ -197,7 +210,7 @@ body {
   padding: 0 var(--side-pad);
   justify-content: space-between;
   border-top: 1px solid rgba(255, 255, 255, 0.06);
-  background: var(--bg);
+  background: transparent;
 }
 
 .bottom-hints {
@@ -286,6 +299,8 @@ body {
 .section-home {
   flex-shrink: 0;
   min-height: 100%;
+  display: flex;
+  flex-direction: column;
   position: relative;
   overflow: hidden;
 }
@@ -300,6 +315,55 @@ body {
 
 .home-backdrop.visible {
   opacity: 1;
+}
+
+.home-vignette {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to bottom, rgba(11, 13, 18, 0.5), transparent 26%, rgba(11, 13, 18, 0.9));
+  pointer-events: none;
+}
+
+.home-glow-blob {
+  position: absolute;
+  right: -160px;
+  bottom: -220px;
+  width: 900px;
+  height: 900px;
+  border-radius: 50%;
+  filter: blur(90px);
+  opacity: 0;
+  transition: background 0.7s ease;
+  pointer-events: none;
+}
+
+.home-glow-blob.visible {
+  animation: home-glow-pulse 9s ease-in-out infinite;
+}
+
+.library-backdrop,
+.stats-backdrop {
+  position: absolute;
+  inset: 0;
+  opacity: 0.4;
+}
+
+.library-backdrop {
+  background: radial-gradient(70% 50% at 20% 0%, rgba(90, 140, 255, 0.16), transparent 70%);
+}
+
+.stats-backdrop {
+  background: radial-gradient(70% 50% at 80% 0%, rgba(120, 110, 255, 0.16), transparent 70%);
+}
+
+@keyframes home-glow-pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 0.75;
+  }
 }
 
 .stats-summary-cards {
@@ -335,10 +399,6 @@ body {
 
 .stat-panel > .section-header {
   margin-bottom: 18px;
-}
-
-.stat-panel .period-card {
-  background: rgba(255, 255, 255, 0.03);
 }
 
 /* Weekday column chart */
@@ -380,7 +440,7 @@ body {
 
 .wd-bar {
   width: 70%;
-  background: var(--neutral-fill);
+  background: rgba(255, 255, 255, 0.32);
   border-radius: 5px 5px 0 0;
   min-height: 2px;
 }
@@ -429,6 +489,13 @@ body {
   border: 1px solid rgba(255, 255, 255, 0.09);
 }
 
+/* Stats' "Visão geral" reuses the same panel component at the tighter
+   padding its own mock (5c) specifies — Detail's dashboard (Turno 4) uses
+   the roomier 30/34 padding above. Same component, two source mockups. */
+.screen-stats .pg-panel {
+  padding: 18px 24px;
+}
+
 .pg-panel-head {
   display: flex;
   align-items: baseline;
@@ -440,6 +507,10 @@ body {
   font-size: 28px;
   font-weight: 700;
   margin-bottom: 22px;
+}
+
+.screen-stats .pg-panel-title {
+  margin-bottom: 14px;
 }
 
 .pg-panel-head .pg-panel-title {
@@ -521,12 +592,20 @@ body {
 .heatmap-grid {
   display: grid;
   grid-template-columns: repeat(13, 1fr);
-  grid-template-rows: repeat(7, 14px);
+  grid-template-rows: repeat(7, 20px);
   grid-auto-flow: column;
-  gap: 5px;
+  gap: 6px;
+}
+
+.screen-stats .heatmap-grid {
+  grid-template-rows: repeat(7, 12px);
 }
 
 .heatmap-cell {
+  border-radius: 4px;
+}
+
+.screen-stats .heatmap-cell {
   border-radius: 3px;
 }
 
@@ -534,12 +613,12 @@ body {
   display: flex;
   align-items: flex-end;
   gap: 3px;
-  height: 150px;
+  height: 130px;
 }
 
 .hour-bar {
   flex: 1;
-  background: var(--neutral-fill);
+  background: rgba(255, 255, 255, 0.26);
   border-radius: 2px 2px 0 0;
   min-height: 2px;
 }
@@ -571,51 +650,35 @@ body {
   font-weight: 700;
 }
 
-/* Period-of-day cards */
-.period-cards {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 14px;
-}
-
-.period-card {
-  background: var(--bg-raised);
-  border-radius: 10px;
-  padding: 18px 20px;
+/* Period-of-day rows — label/value line + thin progress bar, per the mock */
+.period-rows {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 10px;
 }
 
-.period-head {
+.period-row-head {
   display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 0.72rem;
-  font-weight: 600;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--text-muted);
+  justify-content: space-between;
+  font-size: 20px;
+  color: rgba(255, 255, 255, 0.6);
+  margin-bottom: 6px;
 }
 
-.period-icon {
-  font-size: 0.95rem;
+.period-row-head span:last-child {
+  font-family: var(--font-mono);
 }
 
-.period-value {
-  font-size: 1.5rem;
-  font-weight: 800;
-  line-height: 1.1;
-  color: var(--text-dim);
+.period-row-track {
+  height: 8px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.09);
+  overflow: hidden;
 }
 
-.period-card.peak .period-value {
-  color: var(--text);
-}
-
-.period-sub {
-  font-size: 0.75rem;
-  color: var(--text-muted);
+.period-row-fill {
+  height: 100%;
+  background: rgba(255, 255, 255, 0.45);
 }
 
 /* Top games list */
@@ -706,10 +769,10 @@ body {
 }
 
 .hero {
-  position: absolute;
-  inset: 0;
-  bottom: calc(var(--card-h-sel) + 28px);
-  padding: 40px var(--side-pad) 44px;
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  padding: 0 var(--side-pad) 44px;
   display: grid;
   grid-template-columns: 1fr 640px;
   align-items: end;
@@ -884,18 +947,17 @@ body {
 
 /* ── Game row ── */
 .game-row-wrapper {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  padding: 28px var(--side-pad) 28px;
+  position: relative;
+  flex-shrink: 0;
+  padding: 10px 0 0 var(--side-pad);
   overflow: hidden;
 }
 
 .game-row {
   display: flex;
   gap: 18px;
-  align-items: flex-end;
+  align-items: center;
+  height: 240px;
   transition: transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
   will-change: transform;
 }
@@ -909,19 +971,20 @@ body {
   cursor: pointer;
   width: var(--card-w);
   height: var(--card-h);
-  transition:
-    width 0.3s ease,
-    height 0.3s ease,
-    box-shadow 0.3s ease;
+  opacity: 0.55;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+  transition: width 0.34s cubic-bezier(0.2, 0.8, 0.2, 1), height 0.34s cubic-bezier(0.2, 0.8, 0.2, 1),
+    opacity 0.34s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.34s cubic-bezier(0.2, 0.8, 0.2, 1);
   background: var(--bg-card);
 }
 
 .game-card.selected {
   width: var(--card-w-sel);
   height: var(--card-h-sel);
+  opacity: 1;
   box-shadow:
     0 0 0 3px var(--select),
-    0 8px 32px rgba(0, 0, 0, 0.6);
+    0 18px 44px rgba(0, 0, 0, 0.65);
 }
 
 .cover-gradient {
@@ -1012,6 +1075,8 @@ body {
 }
 
 .card-library {
+  opacity: 1;
+  box-shadow: none;
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.16);
   border-radius: 8px;
@@ -1060,31 +1125,29 @@ body {
   opacity: 1;
 }
 
-.detail-topbar {
-  position: relative;
-  z-index: 1;
-  padding: 28px var(--side-pad) 0;
-  flex-shrink: 0;
+/* The mock's literal vignette (.7 alpha fading to solid black by 40%) stacked
+   under the backdrop's own .5 opacity leaves the glow essentially invisible
+   (~5% effective blend) — lightened here, same shape as Home's vignette, so
+   the color actually reads instead of being technically-present-but-unseen. */
+.detail-vignette {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to bottom, rgba(11, 13, 18, 0.5), transparent 30%, rgba(11, 13, 18, 0.85) 70%);
+  pointer-events: none;
 }
 
-.detail-back {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 0.78rem;
-  font-weight: 600;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--text-muted);
+/* Global header's Detail variant — logo + breadcrumb, no nav pills */
+.top-back {
+  margin-left: 34px;
+  font-family: var(--font-mono);
+  font-size: 20px;
+  letter-spacing: 0.14em;
+  color: rgba(255, 255, 255, 0.45);
   cursor: pointer;
 }
 
-.detail-back:hover {
+.top-back:hover {
   color: var(--text-dim);
-}
-.detail-back svg {
-  width: 14px;
-  height: 14px;
 }
 
 .detail-body {
@@ -1131,12 +1194,12 @@ body {
 .detail-tab-content {
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 28px;
 }
 
 .insight-cards {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  grid-template-columns: repeat(4, 1fr);
   gap: 2px;
   background: rgba(255, 255, 255, 0.1);
   border: 1px solid rgba(255, 255, 255, 0.1);
@@ -1146,7 +1209,7 @@ body {
 
 .insight-cards-loose {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  grid-template-columns: repeat(4, 1fr);
   gap: 16px;
 }
 
@@ -1185,9 +1248,8 @@ body {
   font-weight: 800;
 }
 
-.insight-card-sub {
-  font-size: 0.75rem;
-  color: var(--text-muted);
+.insight-card-accent .insight-card-value {
+  color: var(--accent-game, var(--accent));
 }
 
 .detail-main {
@@ -1214,7 +1276,6 @@ body {
 .detail-meta-text {
   font-size: 24px;
   color: rgba(255, 255, 255, 0.55);
-  letter-spacing: 0.04em;
 }
 
 .detail-title {
@@ -1223,32 +1284,6 @@ body {
   letter-spacing: -0.028em;
   line-height: 0.95;
   margin-top: -14px;
-}
-
-.detail-hero-stats {
-  display: flex;
-  align-items: flex-end;
-  gap: 56px;
-}
-
-.detail-hero-stat {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.stat-value-xl {
-  font-size: 64px;
-  font-weight: 800;
-  line-height: 1;
-  color: var(--accent-game, var(--accent));
-}
-
-.stat-value-lg {
-  font-size: 40px;
-  font-weight: 700;
-  line-height: 1;
-  color: var(--text);
 }
 
 .detail-summary {
@@ -1362,7 +1397,8 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
-.ra-placeholder {
+.ra-placeholder,
+.heatmap-empty {
   padding: 16px;
   background: rgba(255, 255, 255, 0.02);
   border-radius: var(--radius);
@@ -1370,6 +1406,13 @@ body {
   font-size: 0.85rem;
   color: var(--text-muted);
   text-align: center;
+}
+
+.heatmap-empty {
+  min-height: 170px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 /* ── Screen: Library ── */
@@ -1382,8 +1425,7 @@ body {
 }
 
 .rail-sort {
-  font-size: 0.78rem;
-  letter-spacing: 0.04em;
+  font-size: 24px;
 }
 
 .library-main {
@@ -1426,7 +1468,7 @@ body {
 .library-grid {
   display: flex;
   flex-wrap: wrap;
-  gap: 20px 14px;
+  gap: 26px;
   padding: 4px 4px 40px;
 }
 
@@ -1435,8 +1477,8 @@ body {
 }
 
 .lib-card-cover {
-  width: var(--card-w);
-  height: var(--card-h);
+  width: var(--card-w-sel);
+  height: var(--card-h-sel);
   border-radius: var(--radius);
   overflow: hidden;
   position: relative;
@@ -1465,7 +1507,7 @@ body {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  width: var(--card-w);
+  width: var(--card-w-sel);
 }
 
 .lib-card-time {
@@ -1495,20 +1537,28 @@ body {
    (stats tabs, library filters, detail sections). */
 .side-rail {
   flex-shrink: 0;
-  width: 260px;
+  width: 300px;
   display: flex;
   flex-direction: column;
   gap: 6px;
+}
+
+.rail-group-label {
+  font-family: var(--font-mono);
+  font-size: 18px;
+  letter-spacing: 0.14em;
+  color: rgba(255, 255, 255, 0.4);
+  margin-bottom: 10px;
 }
 
 .rail-item {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 14px 20px;
+  padding: 18px 24px;
   border-radius: 10px;
   font-size: 26px;
-  font-weight: 700;
+  font-weight: 400;
   color: rgba(255, 255, 255, 0.5);
   cursor: pointer;
   border: 1px solid transparent;
@@ -1530,6 +1580,7 @@ body {
   background: rgba(255, 255, 255, 0.1);
   border-color: rgba(255, 255, 255, 0.22);
   color: var(--text);
+  font-weight: 700;
 }
 
 .rail-item.focused {
@@ -1552,14 +1603,48 @@ body {
   gap: 32px;
 }
 
+/* Stats "Visão geral" — everything in one 4-col grid, matching the mock */
+.stats-overview-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  align-content: start;
+}
+
+.stats-overview-grid .span-2 {
+  grid-column: span 2;
+}
+
+.stats-overview-grid .span-3 {
+  grid-column: span 3;
+}
+
+.stats-overview-grid .span-4 {
+  grid-column: span 4;
+}
+
+.stats-overview-side {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* Grid stretches #top-games-cell (the grid item) to match its sibling's
+   height, but a plain block child doesn't inherit that stretched height on
+   its own — flex it so the .pg-panel inside genuinely fills the cell,
+   letting fitTopGamesList() in stats.js measure the real available space. */
+#top-games-cell {
+  display: flex;
+}
+
+#top-games-cell > .pg-panel {
+  flex: 1;
+}
+
 .top-games-wide {
   max-width: 980px;
 }
 
-.period-cards-row {
-  grid-template-columns: repeat(4, 1fr);
-  max-width: 1100px;
-}
 
 .stats-card {
   background: var(--bg-raised);

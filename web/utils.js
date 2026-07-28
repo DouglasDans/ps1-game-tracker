@@ -2,7 +2,15 @@ const PLATFORM_LOGO = {
   PS1: '/assets/ps1.svg',
   PS2: '/assets/ps2.svg',
   PSP: '/assets/psp.svg',
-  Dreamcast: '/assets/dc.png',
+  Dreamcast: '/assets/dc.svg',
+  SNES: '/assets/snes.svg',
+  'Game Boy': '/assets/gb.svg',
+  GBC: '/assets/gb.svg',
+  GBA: '/assets/gba.png',
+  'Mega Drive': '/assets/md.svg',
+  'Sega CD': '/assets/scd.svg',
+  'Mega-CD': '/assets/scd.svg',
+  MegaCD: '/assets/scd.svg',
 };
 
 const SEGA_PLATFORMS = new Set([
@@ -78,7 +86,23 @@ export function fmtSource(src) {
 }
 
 export function hueGradient(hue) {
-  return `linear-gradient(145deg, hsl(${hue},65%,38%), hsl(${(hue + 50) % 360},55%,18%))`;
+  return `linear-gradient(160deg, hsl(${hue},60%,42%), hsl(${hue},40%,16%))`;
+}
+
+const GLOW_S = 60, GLOW_L = 42;
+
+// The mock's g.glowC formula (two radial washes tinted by the game's hue) —
+// shared by Home and Detail backdrops so they read as the same visual language.
+export function glowCGradient(hue) {
+  const triplet = `${hue} ${GLOW_S}% ${GLOW_L}%`;
+  return `radial-gradient(70% 55% at 62% 0%, hsl(${triplet} / .34), transparent 68%), ` +
+    `radial-gradient(50% 40% at 12% 8%, hsl(${hue} 45% 30% / .35), transparent 70%)`;
+}
+
+// The mock's g.artB formula — the blurred glow blob used on Home's carousel row.
+export function artBGradient(hue) {
+  const triplet = `${hue} ${GLOW_S}% ${GLOW_L}%`;
+  return `radial-gradient(50% 100% at 20% 0%, hsl(${triplet} / .8), transparent 70%)`;
 }
 
 export function hueOfName(name) {
