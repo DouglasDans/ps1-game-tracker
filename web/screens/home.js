@@ -275,7 +275,8 @@ function updateHero(item, active, games) {
     badge.hidden = true;
   }
 
-  const meta = [item.release_year, item.genre, item.developer].filter(Boolean).join(' · ');
+  const firstToken = (value) => value ? value.split(',')[0].trim() : value;
+  const meta = [item.release_year, firstToken(item.genre), firstToken(item.developer)].filter(Boolean).join(' · ');
   platformInfo.innerHTML = `${item.platform ? `${platformLogoImg(item.platform, 'hero-platform-logo')} · ` : ''}${meta}`;
   title.textContent = item.display_name;
   summary.textContent = item.summary ?? '';

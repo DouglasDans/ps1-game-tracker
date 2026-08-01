@@ -107,17 +107,19 @@ body {
   font-family: var(--font-mono);
 }
 
-/* ── Fixed 1920×1080 design canvas, scaled to fit whatever the real
+/* ── Fixed 2260×1271 design canvas, scaled to fit whatever the real
    screen is (Pi TV output, a dev monitor, 4K, 1366×768 — anything) —
    see fitViewport() in app.js. Every px value in this stylesheet assumes
-   the 1920×1080 canvas; scaling the canvas itself keeps every proportion
-   identical instead of reflowing at other resolutions. ── */
+   the 2260×1271 canvas; scaling the canvas itself keeps every proportion
+   identical instead of reflowing at other resolutions. Canvas is larger
+   than the 1920×1080 TV output on purpose: it downscales (~0.85x) on the
+   real 1080p screen, fitting more on screen than a 1:1 canvas would. ── */
 #viewport {
   position: fixed;
   top: 0;
   left: 0;
-  width: 1920px;
-  height: 1080px;
+  width: 2260px;
+  height: 1271px;
   transform-origin: 0 0;
 }
 
@@ -841,7 +843,8 @@ body {
 }
 
 .hero-platform-logo {
-  height: 40px;
+  height: 30px;
+  max-width: none;
 }
 
 .hero-title {

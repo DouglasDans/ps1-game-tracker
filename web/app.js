@@ -200,16 +200,16 @@ function updateControllerStatus(connected) {
   text.textContent = connected ? 'CONTROLE 1' : 'Sem controle';
 }
 
-// Scales the fixed 1920×1080 #viewport to fit whatever the real screen is
+// Scales the fixed 2260×1271 #viewport to fit whatever the real screen is
 // (any resolution/aspect ratio), centered and letterboxed if needed, so the
-// px-based layout never reflows — only the CSS values assuming 1920×1080
+// px-based layout never reflows — only the CSS values assuming 2260×1271
 // stay meaningful.
 function fitViewport() {
   const viewport = document.getElementById('viewport');
   if (!viewport) return;
-  const scale = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
-  const left = (window.innerWidth - 1920 * scale) / 2;
-  const top = (window.innerHeight - 1080 * scale) / 2;
+  const scale = Math.min(window.innerWidth / 2260, window.innerHeight / 1271);
+  const left = (window.innerWidth - 2260 * scale) / 2;
+  const top = (window.innerHeight - 1271 * scale) / 2;
   viewport.style.transform = `translate(${left}px, ${top}px) scale(${scale})`;
 }
 
