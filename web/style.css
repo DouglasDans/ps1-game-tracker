@@ -349,9 +349,6 @@ body {
   border-radius: 50%;
   filter: blur(90px);
   opacity: 0;
-  transition:
-    opacity 0.5s ease,
-    background 0.7s ease;
   pointer-events: none;
 }
 
