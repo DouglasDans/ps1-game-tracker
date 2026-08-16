@@ -299,6 +299,19 @@ function computePerWeek(d) {
   return (d.session_count / Math.max(1, days / 7)).toFixed(1);
 }
 
+function computeLongestSessions(sessions, limit) {
+  const top = sessions
+    .filter(s => s.duration_s)
+    .sort((a, b) => b.duration_s - a.duration_s)
+    .slice(0, limit);
+  const max = top[0]?.duration_s || 1;
+  return top.map(s => ({
+    date: fmtDateShort(s.started_at),
+    duration_s: s.duration_s,
+    pct: Math.max(4, Math.round((s.duration_s / max) * 100)),
+  }));
+}
+
 function buildStatsTab(d) {
   const sessions = d.sessions ?? [];
   const year = new Date().getFullYear();
@@ -308,6 +321,7 @@ function buildStatsTab(d) {
   const hours = computeHours(sessions);
   const { current, longest } = computeStreaks(sessions);
   const perWeek = computePerWeek(d);
+  const longestSessions = computeLongestSessions(sessions, 5);
 
   const monthBars = months.map(m => `
     <div class="wd-col">
@@ -325,6 +339,13 @@ function buildStatsTab(d) {
     </div>`).join('');
 
   const hourBars = hours.map(h => `<div class="hour-bar" style="height:${h.pct}%"></div>`).join('');
+
+  const longestSessionRows = longestSessions.map(s => `
+    <div class="platform-bar-row">
+      <div class="platform-bar-logo stat-label-wide"><span class="platform-text">${s.date}</span></div>
+      <div class="platform-bar-track"><div class="platform-bar-fill" style="width:${s.pct}%"></div></div>
+      <div class="platform-bar-value">${fmtTime(s.duration_s)}</div>
+    </div>`).join('');
 
   return `
     <div class="stats-grid-detail">
@@ -365,6 +386,12 @@ function buildStatsTab(d) {
           <div class="stat-row"><span>Melhor dia</span><span>${fmtDayDate(d.best_day)}</span></div>
           <div class="stat-row"><span>Primeira vez</span><span>${fmtDate(d.first_played)}</span></div>
         </div>
+      </div>
+      <div class="pg-panel span-3">
+        <div class="pg-panel-title">Sessões mais longas</div>
+        ${longestSessions.length
+          ? `<div class="platform-bars">${longestSessionRows}</div>`
+          : `<div class="heatmap-empty">Sem sessões registradas.</div>`}
       </div>
     </div>`;
 }

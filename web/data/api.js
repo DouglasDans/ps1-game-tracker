@@ -16,3 +16,4 @@ export const fetchActiveSession = ()  => apiFetch('/sessions/active');
 export const fetchStats         = ()  => apiFetch('/stats/summary');
 export const fetchActivity      = ()  => apiFetch('/stats/activity');
 export const fetchGameDetail    = (id) => apiFetch(`/games/${id}`);
+export const fetchLongestSessions = (limit = 8) => apiFetch(`/stats/longest-sessions?limit=${limit}`);

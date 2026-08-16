@@ -1,5 +1,5 @@
-import { fetchGames, fetchStats, fetchActivity } from '../data/api.js';
-import { fmtTime, cardGradient, platformLogoImg } from '../utils.js';
+import { fetchGames, fetchStats, fetchActivity, fetchLongestSessions } from '../data/api.js';
+import { fmtTime, fmtDateShort, cardGradient, platformLogoImg } from '../utils.js';
 
 const TABS = [
   { key: 'overview', label: 'Visão geral', icon: 'dashboard' },
@@ -19,13 +19,13 @@ export function mount(container, navigate, params = {}) {
   const backdrop = document.getElementById('screen-backdrop');
   if (backdrop) backdrop.innerHTML = '<div class="stats-backdrop"></div>';
 
-  Promise.all([fetchGames(), fetchStats(), fetchActivity()])
-    .then(([games, stats, activity]) => {
+  Promise.all([fetchGames(), fetchStats(), fetchActivity(), fetchLongestSessions()])
+    .then(([games, stats, activity, longestSessions]) => {
       if (cancelled) return;
 
       const content = {
         overview: buildOverview(stats, games, activity),
-        activity: buildActivity(activity),
+        activity: buildActivity(activity, longestSessions),
         library: buildLibraryTab(stats, games),
       };
 
@@ -297,11 +297,39 @@ function fitTopGamesList(games) {
   list.innerHTML = topGamesList(games, count);
 }
 
-function buildActivity(activity) {
+function longestSessionsList(sessions) {
+  const max = sessions[0]?.duration_s || 1;
+  return sessions.map((s, i) => {
+    const cover = s.cover_url ? `<img src="${s.cover_url}" alt="" class="cover-img">` : '';
+    const pct = Math.max(4, Math.round((s.duration_s / max) * 100));
+    return `<div class="top-game-row">
+      <span class="top-game-rank">${i + 1}</span>
+      <div class="top-game-cover" style="background:${cardGradient(s.display_name)}">${cover}</div>
+      <div class="top-game-info">
+        <div class="top-game-name">${s.display_name}</div>
+        <div class="top-game-sub">${fmtDateShort(s.started_at)}</div>
+        <div class="top-game-bar"><div class="top-game-bar-fill" style="width:${pct}%"></div></div>
+      </div>
+      <div class="top-game-time">${fmtTime(s.duration_s)}</div>
+    </div>`;
+  }).join('');
+}
+
+function longestSessionsPanel(sessions) {
+  const body = sessions?.length
+    ? `<div class="top-games-list">${longestSessionsList(sessions)}</div>`
+    : `<div class="heatmap-empty">Sem sessões registradas.</div>`;
+  return panel('Sessões mais longas', body);
+}
+
+function buildActivity(activity, longestSessions) {
   return `
     ${heatmapPanel(activity)}
-    ${panel('Dia da semana', `<div class="weekday-chart">${weekdayCols(activity)}</div>`)}
-    ${panel('Período do dia', `<div class="period-rows">${periodRows(activity)}</div>`)}`;
+    <div class="stats-activity-row">
+      ${panel('Dia da semana', `<div class="weekday-chart">${weekdayCols(activity)}</div>`)}
+      ${panel('Período do dia', `<div class="period-rows">${periodRows(activity)}</div>`)}
+      ${longestSessionsPanel(longestSessions)}
+    </div>`;
 }
 
 function buildLibraryTab(s, games) {

@@ -490,6 +490,10 @@ body {
   grid-column: span 2;
 }
 
+.stats-grid-detail .span-3 {
+  grid-column: span 3;
+}
+
 .pg-panel {
   padding: 30px 34px;
   border-radius: 16px;
@@ -749,6 +753,13 @@ body {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.top-game-sub {
+  font-family: var(--font-mono);
+  font-size: 15px;
+  color: rgba(255, 255, 255, 0.4);
+  margin-top: 2px;
 }
 
 .top-game-bar {
@@ -1630,6 +1641,13 @@ body {
 
 .stats-overview-grid .span-4 {
   grid-column: span 4;
+}
+
+.stats-activity-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  align-items: start;
 }
 
 .stats-overview-side {
