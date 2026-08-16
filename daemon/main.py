@@ -17,6 +17,7 @@ from daemon.db import (
     get_activity_stats,
     get_game_detail,
     get_games,
+    get_longest_sessions,
     get_recent_sessions,
     get_stats_summary,
     get_unenriched_games,
@@ -263,6 +264,11 @@ def stats_summary():
 @app.get("/stats/activity")
 def stats_activity():
     return get_activity_stats(app.state.conn)
+
+
+@app.get("/stats/longest-sessions")
+def stats_longest_sessions(limit: int = 10):
+    return get_longest_sessions(app.state.conn, limit=limit)
 
 
 @app.post("/admin/reset-enrichment")

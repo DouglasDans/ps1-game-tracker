@@ -8,6 +8,7 @@ from daemon.db import (
     get_activity_stats,
     get_game_detail,
     get_games,
+    get_longest_sessions,
     get_recent_sessions,
     get_stats_summary,
     get_unenriched_games,
@@ -809,3 +810,77 @@ def test_get_recent_sessions_respects_limit(conn):
 
     result = get_recent_sessions(conn, limit=3)
     assert len(result) == 3
+
+
+# --- get_longest_sessions ---
+
+def test_get_longest_sessions_empty_db(conn):
+    assert get_longest_sessions(conn) == []
+
+
+def test_get_longest_sessions_excludes_open_sessions(conn):
+    game_id = upsert_game(conn, "/roms/mgs.chd", "MGS", "PS1", "MGS")
+    open_session(conn, game_id, "duckstation")
+
+    assert get_longest_sessions(conn) == []
+
+
+def test_get_longest_sessions_returns_closed_sessions(conn):
+    game_id = upsert_game(conn, "/roms/ctr.chd", "Crash Team Racing", "PS1", "Crash Team Racing")
+    session_id = open_session(conn, game_id, "duckstation")
+    close_session(conn, session_id)
+    conn.execute(
+        "UPDATE sessions SET started_at = '2026-01-10 10:00:00', duration_s = 3600 WHERE id = ?",
+        (session_id,),
+    )
+    conn.commit()
+
+    result = get_longest_sessions(conn)
+    assert len(result) == 1
+    assert result[0]["display_name"] == "Crash Team Racing"
+    assert result[0]["platform"] == "PS1"
+    assert result[0]["cover_url"] is None
+    assert result[0]["source"] == "duckstation"
+    assert result[0]["started_at"] == "2026-01-10 10:00:00"
+    assert result[0]["duration_s"] == 3600
+
+
+def test_get_longest_sessions_ordered_by_duration_desc(conn):
+    game_id = upsert_game(conn, "/roms/mgs.chd", "MGS", "PS1", "MGS")
+
+    s1 = open_session(conn, game_id, "duckstation")
+    close_session(conn, s1)
+    conn.execute("UPDATE sessions SET duration_s = 500 WHERE id = ?", (s1,))
+
+    s2 = open_session(conn, game_id, "duckstation")
+    close_session(conn, s2)
+    conn.execute("UPDATE sessions SET duration_s = 7200 WHERE id = ?", (s2,))
+    conn.commit()
+
+    result = get_longest_sessions(conn)
+    assert result[0]["duration_s"] == 7200
+    assert result[1]["duration_s"] == 500
+
+
+def test_get_longest_sessions_respects_limit(conn):
+    game_id = upsert_game(conn, "/roms/mgs.chd", "MGS", "PS1", "MGS")
+    for i in range(5):
+        s = open_session(conn, game_id, "duckstation")
+        close_session(conn, s)
+        conn.execute("UPDATE sessions SET duration_s = ? WHERE id = ?", (i, s))
+    conn.commit()
+
+    result = get_longest_sessions(conn, limit=3)
+    assert len(result) == 3
+
+
+def test_get_longest_sessions_default_limit_is_10(conn):
+    game_id = upsert_game(conn, "/roms/mgs.chd", "MGS", "PS1", "MGS")
+    for i in range(15):
+        s = open_session(conn, game_id, "duckstation")
+        close_session(conn, s)
+        conn.execute("UPDATE sessions SET duration_s = ? WHERE id = ?", (i, s))
+    conn.commit()
+
+    result = get_longest_sessions(conn)
+    assert len(result) == 10
