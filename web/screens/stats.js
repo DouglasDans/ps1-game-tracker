@@ -24,6 +24,7 @@ export function mount(container, navigate, params = {}) {
   Promise.all([fetchGames(), fetchStats(), fetchActivity(), fetchLongestSessions(LONGEST_SESSIONS_MAX), fetchMonthly(), fetchMonthlySeries()])
     .then(([games, stats, activity, longestSessions, monthly, series]) => {
       if (cancelled) return;
+      sortSeriesByCurrentMonth(series);
 
       const content = {
         overview: buildOverview(stats, games, activity),
@@ -542,6 +543,14 @@ function evoPath(values, sc) {
   return values.map((v, i) => `${i ? 'L' : 'M'}${sc.x(i).toFixed(1)},${sc.y(v).toFixed(1)}`).join('');
 }
 
+// The 10 games are the all-time top, but the legend ranks and labels them by
+// the current month (the last entry of `monthly`), ties by all-time total.
+// Sorted in place once, so lines, legend and ↑↓ selection share one order.
+function sortSeriesByCurrentMonth(series) {
+  const current = g => g.monthly[g.monthly.length - 1] ?? 0;
+  series?.games.sort((a, b) => current(b) - current(a) || b.total_seconds - a.total_seconds);
+}
+
 function evolutionPanel(series) {
   if (!series?.games.length) return '';
   const sc = evoScales(series);
@@ -564,11 +573,11 @@ function evolutionPanel(series) {
       <span class="evo-key"></span>
       ${coverBox(g, 'top-game-cover')}
       <span class="evo-legend-name">${g.display_name}</span>
-      <span class="evo-legend-time">${fmtTime(g.total_seconds)}</span>
+      <span class="evo-legend-time">${fmtTime(g.monthly[g.monthly.length - 1] ?? 0)}</span>
     </div>`).join('');
 
   return `<div class="pg-panel evo-panel">
-    <div class="pg-panel-head"><span class="pg-panel-title">Evolução</span><span class="pg-panel-sub">TOP 10 · HORAS POR MÊS</span></div>
+    <div class="pg-panel-head"><span class="pg-panel-title">Evolução</span><span class="pg-panel-sub">Top 10 · horas em ${MONTH_NAMES[monthParts(series.months[series.months.length - 1]).index].toLowerCase()}</span></div>
     <div class="evo-body">
       <svg class="evo-chart" viewBox="0 0 ${EVO_W} ${EVO_H}" role="img" aria-label="Horas por mês dos 10 jogos mais jogados">
         ${grid.join('')}${labels}
