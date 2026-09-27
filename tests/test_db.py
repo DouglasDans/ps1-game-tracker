@@ -1,4 +1,5 @@
 from daemon.db import (
+    MIN_SESSION_S,
     upsert_game,
     open_session,
     close_session,
@@ -147,6 +148,8 @@ def test_get_games_returns_game_after_session_closes(conn):
     game_id = upsert_game(conn, "/roms/mgs.cue")
     session_id = open_session(conn, game_id, "duckstation")
     close_session(conn, session_id)
+    conn.execute("UPDATE sessions SET duration_s = 600 WHERE ended_at IS NOT NULL")  # acima de MIN_SESSION_S
+    conn.commit()
 
     games = get_games(conn)
     assert len(games) == 1
@@ -162,6 +165,7 @@ def test_get_games_includes_genre_and_release_year(conn):
     )
     session_id = open_session(conn, game_id, "duckstation")
     close_session(conn, session_id)
+    conn.execute("UPDATE sessions SET duration_s = 600 WHERE ended_at IS NOT NULL")  # acima de MIN_SESSION_S
     conn.commit()
 
     games = get_games(conn)
@@ -177,6 +181,7 @@ def test_get_games_includes_developer_and_game_modes(conn):
     )
     session_id = open_session(conn, game_id, "duckstation")
     close_session(conn, session_id)
+    conn.execute("UPDATE sessions SET duration_s = 600 WHERE ended_at IS NOT NULL")  # acima de MIN_SESSION_S
     conn.commit()
 
     games = get_games(conn)
@@ -192,6 +197,7 @@ def test_get_games_includes_summary(conn):
     )
     session_id = open_session(conn, game_id, "duckstation")
     close_session(conn, session_id)
+    conn.execute("UPDATE sessions SET duration_s = 600 WHERE ended_at IS NOT NULL")  # acima de MIN_SESSION_S
     conn.commit()
 
     games = get_games(conn)
@@ -204,19 +210,19 @@ def test_get_games_includes_days_played(conn):
     s1 = open_session(conn, game_id, "duckstation")
     close_session(conn, s1)
     conn.execute(
-        "UPDATE sessions SET started_at = '2026-01-10 10:00:00', duration_s = 100 WHERE id = ?",
+        "UPDATE sessions SET started_at = '2026-01-10 10:00:00', duration_s = 1000 WHERE id = ?",
         (s1,),
     )
     s2 = open_session(conn, game_id, "duckstation")
     close_session(conn, s2)
     conn.execute(
-        "UPDATE sessions SET started_at = '2026-01-10 20:00:00', duration_s = 100 WHERE id = ?",
+        "UPDATE sessions SET started_at = '2026-01-10 20:00:00', duration_s = 1000 WHERE id = ?",
         (s2,),
     )
     s3 = open_session(conn, game_id, "duckstation")
     close_session(conn, s3)
     conn.execute(
-        "UPDATE sessions SET started_at = '2026-01-11 10:00:00', duration_s = 100 WHERE id = ?",
+        "UPDATE sessions SET started_at = '2026-01-11 10:00:00', duration_s = 1000 WHERE id = ?",
         (s3,),
     )
     conn.commit()
@@ -232,17 +238,17 @@ def test_get_games_aggregates_multi_track_playtime(conn):
 
     s1 = open_session(conn, id1, "duckstation")
     close_session(conn, s1)
-    conn.execute("UPDATE sessions SET duration_s = 100 WHERE id = ?", (s1,))
+    conn.execute("UPDATE sessions SET duration_s = 1000 WHERE id = ?", (s1,))
 
     s2 = open_session(conn, id2, "duckstation")
     close_session(conn, s2)
-    conn.execute("UPDATE sessions SET duration_s = 200 WHERE id = ?", (s2,))
+    conn.execute("UPDATE sessions SET duration_s = 2000 WHERE id = ?", (s2,))
     conn.commit()
 
     games = get_games(conn)
     assert len(games) == 1
     assert games[0]["display_name"] == "Dino Crisis"
-    assert games[0]["total_seconds"] == 300
+    assert games[0]["total_seconds"] == 3000
     assert games[0]["session_count"] == 2
 
 
@@ -464,13 +470,13 @@ def test_get_game_detail_sessions_ordered_newest_first(conn):
     s1 = open_session(conn, game_id, "duckstation")
     close_session(conn, s1)
     conn.execute(
-        "UPDATE sessions SET started_at = '2026-01-01 10:00:00', duration_s = 100 WHERE id = ?",
+        "UPDATE sessions SET started_at = '2026-01-01 10:00:00', duration_s = 1000 WHERE id = ?",
         (s1,),
     )
     s2 = open_session(conn, game_id, "duckstation")
     close_session(conn, s2)
     conn.execute(
-        "UPDATE sessions SET started_at = '2026-02-01 10:00:00', duration_s = 200 WHERE id = ?",
+        "UPDATE sessions SET started_at = '2026-02-01 10:00:00', duration_s = 2000 WHERE id = ?",
         (s2,),
     )
     conn.commit()
@@ -669,6 +675,8 @@ def test_get_stats_summary_total_sessions(conn):
     close_session(conn, s2)
     s3 = open_session(conn, id2, "duckstation")
     close_session(conn, s3)
+    conn.execute("UPDATE sessions SET duration_s = 600 WHERE ended_at IS NOT NULL")  # acima de MIN_SESSION_S
+    conn.commit()
     open_session(conn, id1, "duckstation")  # still open, must not count
 
     result = get_stats_summary(conn)
@@ -691,6 +699,7 @@ def test_get_stats_summary_total_days_played_counts_distinct_days_across_games(c
     s3 = open_session(conn, id1, "duckstation")
     close_session(conn, s3)
     conn.execute("UPDATE sessions SET started_at = '2026-01-11 10:00:00' WHERE id = ?", (s3,))
+    conn.execute("UPDATE sessions SET duration_s = 600 WHERE ended_at IS NOT NULL")  # acima de MIN_SESSION_S
     conn.commit()
 
     result = get_stats_summary(conn)
@@ -786,13 +795,13 @@ def test_get_recent_sessions_ordered_newest_first(conn):
     s1 = open_session(conn, game_id, "duckstation")
     close_session(conn, s1)
     conn.execute(
-        "UPDATE sessions SET started_at = '2026-01-01 10:00:00', duration_s = 100 WHERE id = ?",
+        "UPDATE sessions SET started_at = '2026-01-01 10:00:00', duration_s = 1000 WHERE id = ?",
         (s1,),
     )
     s2 = open_session(conn, game_id, "duckstation")
     close_session(conn, s2)
     conn.execute(
-        "UPDATE sessions SET started_at = '2026-03-01 10:00:00', duration_s = 200 WHERE id = ?",
+        "UPDATE sessions SET started_at = '2026-03-01 10:00:00', duration_s = 2000 WHERE id = ?",
         (s2,),
     )
     conn.commit()
@@ -807,6 +816,8 @@ def test_get_recent_sessions_respects_limit(conn):
     for _ in range(5):
         s = open_session(conn, game_id, "duckstation")
         close_session(conn, s)
+    conn.execute("UPDATE sessions SET duration_s = 600 WHERE ended_at IS NOT NULL")  # acima de MIN_SESSION_S
+    conn.commit()
 
     result = get_recent_sessions(conn, limit=3)
     assert len(result) == 3
@@ -867,7 +878,7 @@ def test_get_longest_sessions_respects_limit(conn):
     for i in range(5):
         s = open_session(conn, game_id, "duckstation")
         close_session(conn, s)
-        conn.execute("UPDATE sessions SET duration_s = ? WHERE id = ?", (i, s))
+        conn.execute("UPDATE sessions SET duration_s = ? WHERE id = ?", (MIN_SESSION_S + i, s))
     conn.commit()
 
     result = get_longest_sessions(conn, limit=3)
@@ -879,8 +890,68 @@ def test_get_longest_sessions_default_limit_is_10(conn):
     for i in range(15):
         s = open_session(conn, game_id, "duckstation")
         close_session(conn, s)
-        conn.execute("UPDATE sessions SET duration_s = ? WHERE id = ?", (i, s))
+        conn.execute("UPDATE sessions SET duration_s = ? WHERE id = ?", (MIN_SESSION_S + i, s))
     conn.commit()
 
     result = get_longest_sessions(conn)
     assert len(result) == 10
+
+
+# --- sessões de teste (< MIN_SESSION_S) ficam fora das estatísticas ---
+
+def _played(conn, game_id, duration_s, started_at="2026-07-09 22:00:00"):
+    s = open_session(conn, game_id, "duckstation")
+    close_session(conn, s)
+    conn.execute(
+        "UPDATE sessions SET duration_s = ?, started_at = ? WHERE id = ?",
+        (duration_s, started_at, s),
+    )
+    conn.commit()
+    return s
+
+
+def test_short_session_excluded_from_stats_summary(conn):
+    game_id = upsert_game(conn, "/roms/mgs.chd", "MGS", "PS1", "MGS")
+    _played(conn, game_id, MIN_SESSION_S)
+    _played(conn, game_id, MIN_SESSION_S - 1, started_at="2026-07-10 22:00:00")
+
+    result = get_stats_summary(conn)
+    assert result["total_seconds"] == MIN_SESSION_S
+    assert result["total_sessions"] == 1
+    assert result["total_days_played"] == 1
+
+
+def test_short_session_excluded_from_game_detail(conn):
+    game_id = upsert_game(conn, "/roms/mgs.chd", "MGS", "PS1", "MGS")
+    _played(conn, game_id, 600)
+    _played(conn, game_id, 30)
+
+    detail = get_game_detail(conn, game_id)
+    assert detail["session_count"] == 1
+    assert detail["avg_session_s"] == 600
+    assert [s["duration_s"] for s in detail["sessions"]] == [600]
+
+
+def test_game_with_only_short_sessions_hidden_from_games(conn):
+    tested = upsert_game(conn, "/roms/ctr.chd", "CTR", "PS1", "CTR")
+    played = upsert_game(conn, "/roms/mgs.chd", "MGS", "PS1", "MGS")
+    _played(conn, tested, 30)
+    _played(conn, played, 600)
+
+    assert [g["display_name"] for g in get_games(conn)] == ["MGS"]
+
+
+def test_short_session_excluded_from_activity_and_rankings(conn):
+    game_id = upsert_game(conn, "/roms/mgs.chd", "MGS", "PS1", "MGS")
+    _played(conn, game_id, 30)
+
+    assert sum(h["total_seconds"] for h in get_activity_stats(conn)["by_hour"]) == 0
+    assert get_longest_sessions(conn) == []
+    assert get_recent_sessions(conn) == []
+
+
+def test_short_session_kept_in_database(conn):
+    game_id = upsert_game(conn, "/roms/mgs.chd", "MGS", "PS1", "MGS")
+    _played(conn, game_id, 30)
+
+    assert conn.execute("SELECT COUNT(*) FROM sessions").fetchone()[0] == 1

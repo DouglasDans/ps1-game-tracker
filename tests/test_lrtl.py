@@ -414,3 +414,14 @@ def test_migrate_is_idempotent(conn, tmp_path):
     assert conn.execute("SELECT COUNT(*) FROM games").fetchone()[0] == 1
     row = conn.execute("SELECT display_name FROM games").fetchone()
     assert row["display_name"] == "Ico"
+
+
+def test_import_sessions_does_not_reimport_short_session(conn, tmp_path):
+    # O delta do lrtl é calculado sobre as sessões brutas: uma sessão curta
+    # (ignorada nas estatísticas) ainda conta no acumulado já importado.
+    logs_dir = tmp_path / "logs"
+    logs_dir.mkdir()
+    (logs_dir / "Ico.lrtl").write_text(json.dumps({**_LRTL, "runtime": "0:00:30"}))
+
+    assert import_sessions(conn, [str(tmp_path)]) == 1
+    assert import_sessions(conn, [str(tmp_path)]) == 0

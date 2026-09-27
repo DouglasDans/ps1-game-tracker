@@ -175,8 +175,16 @@ ps1-game-tracker/
 │ synced_to_notion INTEGER  ← 0 / 1                       │
 └─────────────────────────────────────────────────────────┘
 
+VIEW played_sessions
+  sessions fechadas com duration_s >= MIN_SESSION_S (120s, em db.py).
+  Sessões mais curtas são "abri pra testar": ficam no banco, mas toda
+  query de estatística lê desta view — contagem, tempo, dias, streak,
+  listas. Jogo só com sessões curtas some da biblioteca. Exceções que
+  leem sessions direto: sessão ativa/heartbeat/crash recovery e o delta
+  do lrtl_importer (senão reimportaria sessões curtas a cada boot).
+
 VIEW playtime_summary
-  Agrega sessions por canonical_name (ou file_path).
+  Agrega played_sessions por canonical_name (ou file_path).
   Expõe: id, file_path, display_name, platform, cover_url,
          genre, release_year, developer, game_modes, summary,
          session_count, total_seconds, days_played, last_played,
