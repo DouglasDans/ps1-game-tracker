@@ -97,8 +97,7 @@ ps1-game-tracker/
 │   │   ├── detail.js        # detalhe do jogo: stats estendidas + histórico de sessões
 │   │   └── library.js       # grid completo com filtros por plataforma (L1/R1)
 │   ├── data/
-│   │   ├── api.js           # fetch da API (same-origin em prod; Pi em dev local)
-│   │   └── mock.js
+│   │   └── api.js           # fetch da API (same-origin em prod; Pi em dev local)
 │   └── assets/              # logos de plataforma (ps1/ps2/psp/dc/sega)
 ├── tests/
 │   ├── conftest.py
