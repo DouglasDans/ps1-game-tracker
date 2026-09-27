@@ -18,6 +18,7 @@ from daemon.db import (
     get_game_detail,
     get_games,
     get_longest_sessions,
+    get_monthly_series,
     get_monthly_stats,
     get_stats_summary,
     get_unenriched_games,
@@ -264,6 +265,11 @@ def stats_activity():
 @app.get("/stats/monthly")
 def stats_monthly():
     return get_monthly_stats(app.state.conn)
+
+
+@app.get("/stats/monthly-series")
+def stats_monthly_series():
+    return get_monthly_series(app.state.conn)
 
 
 @app.get("/stats/longest-sessions")

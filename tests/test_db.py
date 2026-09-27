@@ -12,6 +12,7 @@ from daemon.db import (
     get_game_detail,
     get_games,
     get_longest_sessions,
+    get_monthly_series,
     get_monthly_stats,
     get_stats_summary,
     get_unenriched_games,
@@ -909,3 +910,15 @@ def test_get_monthly_stats_groups_by_canonical_name_and_skips_short_sessions(con
     assert month["games_played"] == 1
     assert month["top_games"][0]["display_name"] == "Dino Crisis"
     assert month["top_games"][0]["total_seconds"] == 1500
+
+
+def test_get_monthly_series_skips_short_sessions(conn):
+    played = upsert_game(conn, "/roms/mgs.chd", "MGS", "PS1", "MGS")
+    tested = upsert_game(conn, "/roms/ctr.chd", "CTR", "PS1", "CTR")
+    _played(conn, played, 600, started_at="2026-09-10 20:00:00")
+    _played(conn, tested, 30, started_at="2026-09-11 20:00:00")
+
+    result = get_monthly_series(conn, today=date(2026, 9, 27))
+
+    assert [g["display_name"] for g in result["games"]] == ["MGS"]
+    assert result["games"][0]["monthly"] == [600]

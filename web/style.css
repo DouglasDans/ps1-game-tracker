@@ -1872,6 +1872,13 @@ body {
    Hero (mês atual) + grade 6×2 dos 12 anteriores. Cada card herda a cor do
    jogo do mês via tintByCover() em stats.js: fundo sólido no matiz da capa e
    --accent-game nos valores de destaque. */
+/* Tighter than .stats-content's 32px gap: hero + chart + 2-row grid must fit one screen. */
+.month-tab {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
 .month-hero {
   display: flex;
   align-items: center;
@@ -1881,8 +1888,8 @@ body {
 .month-hero-cover {
   position: relative;
   flex-shrink: 0;
-  width: 150px;
-  height: 200px;
+  width: 96px;
+  height: 128px;
   border-radius: 10px;
   overflow: hidden;
 }
@@ -1896,7 +1903,7 @@ body {
 }
 
 .month-hero-name {
-  font-size: 48px;
+  font-size: 40px;
   font-weight: 800;
   line-height: 1.05;
   white-space: nowrap;
@@ -1905,7 +1912,7 @@ body {
 }
 
 .month-hero-time {
-  font-size: 40px;
+  font-size: 34px;
   font-weight: 800;
   line-height: 1;
   font-variant-numeric: tabular-nums;
@@ -1931,7 +1938,7 @@ body {
   flex-shrink: 0;
   display: grid;
   grid-template-columns: repeat(2, minmax(190px, auto));
-  gap: 26px 44px;
+  gap: 16px 44px;
 }
 
 .month-stat {
@@ -1955,7 +1962,7 @@ body {
 .month-card {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 10px;
   min-width: 0;
 }
 
@@ -1969,8 +1976,8 @@ body {
 .month-card-cover {
   position: relative;
   flex-shrink: 0;
-  width: 72px;
-  height: 96px;
+  width: 48px;
+  height: 64px;
   border-radius: 6px;
   overflow: hidden;
 }
@@ -1983,7 +1990,7 @@ body {
 }
 
 .month-card-name {
-  font-size: 22px;
+  font-size: 20px;
   font-weight: 700;
   line-height: 1.15;
   display: -webkit-box;
@@ -1993,7 +2000,7 @@ body {
 }
 
 .month-card-time {
-  font-size: 26px;
+  font-size: 22px;
   font-weight: 800;
   font-variant-numeric: tabular-nums;
   color: var(--accent-game, var(--accent));
@@ -2016,4 +2023,121 @@ body {
 
 .month-hero-name.month-empty-text {
   font-size: 32px;
+}
+
+/* Evolução — gráfico de ênfase: 10 linhas cinza de contexto, uma na cor do
+   jogo selecionado (↑↓ com foco no conteúdo). Texto nunca na cor da série. */
+.evo-body {
+  display: grid;
+  grid-template-columns: 1fr 440px;
+  gap: 28px;
+  align-items: center;
+}
+
+.evo-chart {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.evo-grid {
+  stroke: rgba(255, 255, 255, 0.08);
+  stroke-width: 1;
+}
+
+.evo-axis {
+  font-family: var(--font-mono);
+  font-size: 15px;
+  fill: rgba(255, 255, 255, 0.45);
+}
+
+.evo-axis-year {
+  fill: rgba(255, 255, 255, 0.28);
+}
+
+.evo-line {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.3);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.evo-line.dim {
+  stroke: rgba(255, 255, 255, 0.14);
+}
+
+.evo-line-focus {
+  fill: none;
+  stroke-width: 3;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.evo-dot {
+  stroke: var(--bg);
+  stroke-width: 2;
+}
+
+.evo-value {
+  font-family: var(--font-mono);
+  font-size: 15px;
+  fill: var(--text);
+}
+
+.evo-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.evo-legend-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 1px 10px;
+  border-radius: 8px;
+  border: 2px solid transparent;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.evo-legend-row .top-game-cover {
+  width: 16px;
+  height: 21px;
+  padding: 0;
+}
+
+.evo-key {
+  flex-shrink: 0;
+  width: 14px;
+  height: 3px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.evo-legend-row.active {
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--text);
+}
+
+.evo-legend-row.active .evo-key {
+  background: var(--series-color, var(--accent));
+}
+
+.evo-legend-row.focused {
+  border-color: var(--select);
+}
+
+.evo-legend-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 17px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.evo-legend-time {
+  font-family: var(--font-mono);
+  font-size: 15px;
 }

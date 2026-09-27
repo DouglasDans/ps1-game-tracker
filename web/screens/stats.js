@@ -1,4 +1,4 @@
-import { fetchGames, fetchStats, fetchActivity, fetchLongestSessions, fetchMonthly } from '../data/api.js';
+import { fetchGames, fetchStats, fetchActivity, fetchLongestSessions, fetchMonthly, fetchMonthlySeries } from '../data/api.js';
 import { fmtTime, fmtDateShort, cardGradient, platformLogoImg, extractDominantColor, hueOf, hueOfName } from '../utils.js';
 
 const TABS = [
@@ -13,6 +13,7 @@ const SCROLL_STEP = 240;
 export function mount(container, navigate, params = {}) {
   let tabIndex = Math.max(0, TABS.findIndex(t => t.key === params.tab));
   let focus = 'rail';
+  let seriesIndex = 0;
   let onKeyHandler = null;
   let cancelled = false;
 
@@ -20,14 +21,14 @@ export function mount(container, navigate, params = {}) {
   const backdrop = document.getElementById('screen-backdrop');
   if (backdrop) backdrop.innerHTML = '<div class="stats-backdrop"></div>';
 
-  Promise.all([fetchGames(), fetchStats(), fetchActivity(), fetchLongestSessions(LONGEST_SESSIONS_MAX), fetchMonthly()])
-    .then(([games, stats, activity, longestSessions, monthly]) => {
+  Promise.all([fetchGames(), fetchStats(), fetchActivity(), fetchLongestSessions(LONGEST_SESSIONS_MAX), fetchMonthly(), fetchMonthlySeries()])
+    .then(([games, stats, activity, longestSessions, monthly, series]) => {
       if (cancelled) return;
 
       const content = {
         overview: buildOverview(stats, games, activity),
         activity: buildActivity(activity, longestSessions),
-        monthly: buildMonthly(monthly),
+        monthly: buildMonthly(monthly, series),
         library: buildLibraryTab(stats, games),
       };
 
@@ -52,6 +53,7 @@ export function mount(container, navigate, params = {}) {
           fitList('longest-sessions-cell', 'longest-sessions-list', n => longestSessionsList(longestSessions.slice(0, n)), longestSessions.length);
         } else if (key === 'monthly') {
           tintByCover(document.getElementById('stats-content'));
+          selectSeries(seriesIndex);
         }
       }
 
@@ -75,6 +77,14 @@ export function mount(container, navigate, params = {}) {
         el.addEventListener('click', () => setTab(i));
       });
 
+      // Monthly tab: the evolution chart highlights one of the top-10 games;
+      // with focus in the content, ↑↓ moves the highlight instead of scrolling.
+      function selectSeries(i) {
+        if (!series?.games.length) return;
+        seriesIndex = Math.max(0, Math.min(series.games.length - 1, i));
+        highlightSeries(series, seriesIndex, focus === 'content');
+      }
+
       function onKey(e) {
         if (e.key === 'Escape' || e.key === 'Backspace') { navigate('home'); return; }
         const scroller = document.getElementById('stats-content');
@@ -82,12 +92,17 @@ export function mount(container, navigate, params = {}) {
         if (focus === 'rail') {
           if (e.key === 'ArrowDown') { e.preventDefault(); if (tabIndex < TABS.length - 1) setTab(tabIndex + 1); }
           if (e.key === 'ArrowUp')   { e.preventDefault(); if (tabIndex > 0) setTab(tabIndex - 1); }
-          if (e.key === 'ArrowRight') { focus = 'content'; refreshRail(); }
+          if (e.key === 'ArrowRight') { focus = 'content'; refreshRail(); if (TABS[tabIndex].key === 'monthly') selectSeries(seriesIndex); }
           return;
         }
 
         // focus === 'content' — d-pad scrolls the tab body
-        if (e.key === 'ArrowLeft') { focus = 'rail'; refreshRail(); return; }
+        if (e.key === 'ArrowLeft') { focus = 'rail'; refreshRail(); if (TABS[tabIndex].key === 'monthly') selectSeries(seriesIndex); return; }
+        if (TABS[tabIndex].key === 'monthly' && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
+          e.preventDefault();
+          selectSeries(seriesIndex + (e.key === 'ArrowDown' ? 1 : -1));
+          return;
+        }
         if (!scroller) return;
         if (e.key === 'ArrowDown') { e.preventDefault(); scroller.scrollBy({ top: SCROLL_STEP, behavior: 'smooth' }); }
         if (e.key === 'ArrowUp')   { e.preventDefault(); scroller.scrollBy({ top: -SCROLL_STEP, behavior: 'smooth' }); }
@@ -474,13 +489,16 @@ function monthCard(month) {
   </div>`;
 }
 
-// Current month in the spotlight; the 12 before it as a 6×2 grid.
-function buildMonthly(months) {
+// Current month in the spotlight, the top-10 evolution chart, then the 12
+// months before it as a 6×2 grid.
+function buildMonthly(months, series) {
   if (!months?.length) return `<div class="heatmap-empty">Sem dados mensais.</div>`;
   const [current, ...past] = months;
-  return `
+  return `<div class="month-tab">
     ${monthHero(current, past[0])}
-    <div class="month-grid">${past.map(monthCard).join('')}</div>`;
+    ${evolutionPanel(series)}
+    <div class="month-grid">${past.map(monthCard).join('')}</div>
+  </div>`;
 }
 
 function tintByCover(root) {
@@ -495,4 +513,107 @@ function tintByCover(root) {
     apply(hueOfName(el.dataset.name));
     extractDominantColor(el.dataset.cover || null).then(c => { if (c) apply(hueOf(c)); });
   });
+}
+
+// ── Evolução: top 10 de todo o histórico, horas por mês ────────────────────
+// Emphasis chart: every game is a gray context line; only the selected one
+// is drawn in its cover color, labeled month by month. One colored line at a
+// time is what keeps same-franchise covers (GT2/3/4) from colliding.
+const EVO_W = 1100;
+const EVO_H = 250;
+const EVO_PAD = { top: 30, right: 56, bottom: 40, left: 64 };
+const _seriesHue = new Map();
+
+function evoScales(series) {
+  const peak = Math.max(1, ...series.games.flatMap(g => g.monthly));
+  const stepH = peak / 3600 > 6 ? 2 : 1;
+  const maxH = Math.max(stepH, Math.ceil(peak / 3600 / stepH) * stepH);
+  const n = series.months.length;
+  const plotW = EVO_W - EVO_PAD.left - EVO_PAD.right;
+  const plotH = EVO_H - EVO_PAD.top - EVO_PAD.bottom;
+  return {
+    stepH, maxH,
+    x: i => EVO_PAD.left + (n === 1 ? plotW / 2 : (i / (n - 1)) * plotW),
+    y: secs => EVO_PAD.top + plotH - (secs / 3600 / maxH) * plotH,
+  };
+}
+
+function evoPath(values, sc) {
+  return values.map((v, i) => `${i ? 'L' : 'M'}${sc.x(i).toFixed(1)},${sc.y(v).toFixed(1)}`).join('');
+}
+
+function evolutionPanel(series) {
+  if (!series?.games.length) return '';
+  const sc = evoScales(series);
+  const grid = [];
+  for (let h = 0; h <= sc.maxH; h += sc.stepH) {
+    const y = sc.y(h * 3600).toFixed(1);
+    grid.push(`<line class="evo-grid" x1="${EVO_PAD.left}" x2="${EVO_W - EVO_PAD.right}" y1="${y}" y2="${y}"/>`,
+      `<text class="evo-axis" x="${EVO_PAD.left - 14}" y="${y}" text-anchor="end" dominant-baseline="middle">${h}h</text>`);
+  }
+  const labels = series.months.map((m, i) => {
+    const { year, index } = monthParts(m);
+    const showYear = i === 0 || index === 0;
+    return `<text class="evo-axis" x="${sc.x(i).toFixed(1)}" y="${EVO_H - 18}" text-anchor="middle">${MONTH_SHORT[index]}${showYear ? ` <tspan class="evo-axis-year">${year}</tspan>` : ''}</text>`;
+  }).join('');
+  const context = series.games.map((g, i) =>
+    `<path class="evo-line" data-series="${i}" d="${evoPath(g.monthly, sc)}"/>`).join('');
+
+  const legend = series.games.map((g, i) => `
+    <div class="evo-legend-row" data-series="${i}" data-name="${g.display_name}" data-cover="${g.cover_url ?? ''}">
+      <span class="evo-key"></span>
+      ${coverBox(g, 'top-game-cover')}
+      <span class="evo-legend-name">${g.display_name}</span>
+      <span class="evo-legend-time">${fmtTime(g.total_seconds)}</span>
+    </div>`).join('');
+
+  return `<div class="pg-panel evo-panel">
+    <div class="pg-panel-head"><span class="pg-panel-title">Evolução</span><span class="pg-panel-sub">TOP 10 · HORAS POR MÊS</span></div>
+    <div class="evo-body">
+      <svg class="evo-chart" viewBox="0 0 ${EVO_W} ${EVO_H}" role="img" aria-label="Horas por mês dos 10 jogos mais jogados">
+        ${grid.join('')}${labels}
+        <g class="evo-context">${context}</g>
+        <g class="evo-focus"></g>
+      </svg>
+      <div class="evo-legend">${legend}</div>
+    </div>
+  </div>`;
+}
+
+function highlightSeries(series, index, focused) {
+  const svg = document.querySelector('.evo-chart');
+  if (!svg) return;
+  const game = series.games[index];
+  const sc = evoScales(series);
+
+  svg.querySelectorAll('.evo-line').forEach(el => el.classList.toggle('dim', +el.dataset.series !== index));
+  document.querySelectorAll('.evo-legend-row').forEach(el => {
+    const on = +el.dataset.series === index;
+    el.classList.toggle('active', on);
+    el.classList.toggle('focused', on && focused);
+  });
+
+  const draw = hue => {
+    const color = `hsl(${hue} 80% 65%)`;
+    const points = game.monthly.map((v, i) => {
+      const x = sc.x(i).toFixed(1), y = sc.y(v).toFixed(1);
+      const label = v ? `<text class="evo-value" x="${x}" y="${(sc.y(v) - 16).toFixed(1)}" text-anchor="middle">${fmtTime(v)}</text>` : '';
+      return `<circle class="evo-dot" cx="${x}" cy="${y}" r="5" fill="${color}"/>${label}`;
+    }).join('');
+    svg.querySelector('.evo-focus').innerHTML =
+      `<path class="evo-line-focus" d="${evoPath(game.monthly, sc)}" stroke="${color}"/>${points}`;
+    document.querySelectorAll('.evo-legend-row').forEach(el => {
+      if (+el.dataset.series === index) el.style.setProperty('--series-color', color);
+    });
+  };
+
+  const key = game.cover_url || game.display_name;
+  draw(_seriesHue.get(key) ?? hueOfName(game.display_name));
+  if (!_seriesHue.has(key)) {
+    extractDominantColor(game.cover_url).then(c => {
+      if (!c) return;
+      _seriesHue.set(key, hueOf(c));
+      if (document.querySelector('.evo-legend-row.active')?.dataset.series === String(index)) draw(hueOf(c));
+    });
+  }
 }

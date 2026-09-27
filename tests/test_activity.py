@@ -1,6 +1,6 @@
 from datetime import date
 
-from daemon.activity import compute_activity_patterns, compute_monthly, compute_streaks
+from daemon.activity import compute_activity_patterns, compute_monthly, compute_monthly_series, compute_streaks
 
 
 def _session(started_at, duration_s=600):
@@ -227,3 +227,53 @@ def test_compute_monthly_new_games_counts_history_before_window():
     ]
 
     assert compute_monthly(sessions, today=date(2026, 9, 27))[0]["new_games"] == 0
+
+
+# --- compute_monthly_series ---
+
+def test_compute_monthly_series_empty_has_only_current_month():
+    result = compute_monthly_series([], today=date(2026, 9, 27))
+
+    assert result == {"months": ["2026-09"], "games": []}
+
+
+def test_compute_monthly_series_spans_first_month_to_today_including_gaps():
+    sessions = [_play("2026-02-10 20:00:00"), _play("2026-05-10 20:00:00")]
+
+    result = compute_monthly_series(sessions, today=date(2026, 9, 27))
+
+    assert result["months"] == ["2026-02", "2026-03", "2026-04", "2026-05", "2026-06", "2026-07", "2026-08", "2026-09"]
+
+
+def test_compute_monthly_series_spans_year_boundary():
+    result = compute_monthly_series([_play("2025-11-10 20:00:00")], today=date(2026, 1, 5))
+
+    assert result["months"] == ["2025-11", "2025-12", "2026-01"]
+
+
+def test_compute_monthly_series_game_has_one_value_per_month_in_local_time():
+    # 2026-08-01 02:00 UTC == 2026-07-31 23:00 America/Sao_Paulo → julho
+    sessions = [
+        _play("2026-07-10 20:00:00", 600),
+        _play("2026-08-01 02:00:00", 300),
+        _play("2026-09-10 20:00:00", 900),
+    ]
+
+    game = compute_monthly_series(sessions, today=date(2026, 9, 27))["games"][0]
+
+    assert game["monthly"] == [900, 0, 900]
+    assert game["total_seconds"] == 1800
+    assert game == {**game, "id": 1, "display_name": "MGS", "platform": "PS1", "cover_url": "c.jpg"}
+
+
+def test_compute_monthly_series_keeps_top_10_by_total_time():
+    sessions = [
+        _play("2026-09-10 20:00:00", 1000 + i, key=f"g{i}", name=f"G{i}", game_id=i)
+        for i in range(12)
+    ]
+
+    games = compute_monthly_series(sessions, today=date(2026, 9, 27))["games"]
+
+    assert len(games) == 10
+    assert [g["display_name"] for g in games[:2]] == ["G11", "G10"]
+    assert "G0" not in [g["display_name"] for g in games]

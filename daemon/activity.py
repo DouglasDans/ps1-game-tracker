@@ -155,3 +155,54 @@ def compute_monthly(sessions: list[dict], today: date | None = None) -> list[dic
         }
         for key in months
     ]
+
+
+SERIES_TOP_GAMES = 10
+
+
+def compute_monthly_series(sessions: list[dict], today: date | None = None) -> dict:
+    """Horas por mês dos 10 jogos mais jogados de todo o histórico.
+
+    `months` vai do mês da primeira sessão até o mês atual, sem pular meses
+    vazios; cada jogo traz `monthly` com um valor por mês, na mesma ordem.
+    """
+    today = today or datetime.now(LOCAL_TZ).date()
+    per_game: dict[str, dict] = {}
+    first = _month_key(today)
+
+    for s in sessions:
+        started_at = s.get("started_at")
+        if not started_at:
+            continue
+        key = _month_key(_to_local(started_at).date())
+        first = min(first, key)
+        game = per_game.setdefault(s["game_key"], {
+            "id": s["game_id"],
+            "display_name": s["display_name"],
+            "platform": s["platform"],
+            "cover_url": s["cover_url"],
+            "total_seconds": 0,
+            "by_month": {},
+        })
+        duration = s.get("duration_s") or 0
+        game["total_seconds"] += duration
+        game["by_month"][key] = game["by_month"].get(key, 0) + duration
+        game["cover_url"] = game["cover_url"] or s["cover_url"]
+
+    months = []
+    y, m = map(int, first.split("-"))
+    while (key := f"{y:04d}-{m:02d}") <= _month_key(today):
+        months.append(key)
+        y, m = (y, m + 1) if m < 12 else (y + 1, 1)
+
+    top = sorted(per_game.values(), key=lambda g: g["total_seconds"], reverse=True)[:SERIES_TOP_GAMES]
+    return {
+        "months": months,
+        "games": [
+            {
+                **{k: v for k, v in g.items() if k != "by_month"},
+                "monthly": [g["by_month"].get(k, 0) for k in months],
+            }
+            for g in top
+        ],
+    }

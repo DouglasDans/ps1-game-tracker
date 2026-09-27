@@ -1,7 +1,7 @@
 import sqlite3
 from datetime import date
 
-from daemon.activity import compute_activity_patterns, compute_monthly
+from daemon.activity import compute_activity_patterns, compute_monthly, compute_monthly_series
 
 # Sessões mais curtas que isso são "abri pra testar" — ficam no banco, mas
 # fora de todas as estatísticas (via view played_sessions).
@@ -439,7 +439,7 @@ def get_activity_stats(conn: sqlite3.Connection) -> dict:
     return compute_activity_patterns([dict(r) for r in rows])
 
 
-def get_monthly_stats(conn: sqlite3.Connection, today: date | None = None) -> list[dict]:
+def _monthly_rows(conn: sqlite3.Connection) -> list[dict]:
     rows = conn.execute(
         """
         SELECT s.started_at, s.duration_s, g.id AS game_id,
@@ -450,7 +450,15 @@ def get_monthly_stats(conn: sqlite3.Connection, today: date | None = None) -> li
         JOIN games g ON g.id = s.game_id
         """
     ).fetchall()
-    return compute_monthly([dict(r) for r in rows], today=today)
+    return [dict(r) for r in rows]
+
+
+def get_monthly_stats(conn: sqlite3.Connection, today: date | None = None) -> list[dict]:
+    return compute_monthly(_monthly_rows(conn), today=today)
+
+
+def get_monthly_series(conn: sqlite3.Connection, today: date | None = None) -> dict:
+    return compute_monthly_series(_monthly_rows(conn), today=today)
 
 
 def get_longest_sessions(conn: sqlite3.Connection, limit: int = 10) -> list[dict]:
