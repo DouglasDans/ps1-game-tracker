@@ -1860,7 +1860,10 @@ body {
   gap: 16px;
 }
 
-.month-hero {
+/* Uniform padding (not the 18/24 of .screen-stats .pg-panel) + a cover
+   stretched to the card's full inner height: the cover sits the same
+   distance from the top, bottom and left edges. */
+.screen-stats .pg-panel.month-hero {
   padding: 24px;
 }
 
@@ -1873,8 +1876,8 @@ body {
 .month-hero-cover {
   position: relative;
   flex-shrink: 0;
-  width: 96px;
-  height: 128px;
+  align-self: stretch;
+  aspect-ratio: 3 / 4;
   border-radius: 10px;
   overflow: hidden;
 }
@@ -1915,7 +1918,7 @@ body {
 
 .month-hero-others b {
   font-family: var(--font-text);
-  font-weight: 400;
+  font-weight: 700;
   color: rgba(255, 255, 255, 0.85);
 }
 
