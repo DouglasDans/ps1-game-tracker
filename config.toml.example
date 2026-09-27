@@ -10,9 +10,10 @@ rom_extensions = [".cue", ".chd", ".bin", ".iso", ".cso", ".pbp"]
 # Apenas arquivos dentro destes diretórios são tratados como ROMs (whitelist)
 rom_dirs = ["/mnt/usb-flash"]
 
-# PS2 via OPL/Samba — paths no servidor onde as ISOs estão acessíveis
+# PS2 via OPL/Samba — raiz do share (o `path` do smb.conf), não as subpastas:
+# CD/ e DVD/ e as extensões .iso/.zso são regras fixas do OPL, em samba.py
 # Requer: douglasdans ALL=(ALL) NOPASSWD: /usr/bin/smbstatus
-samba_rom_dirs = []  # ex: ["/srv/samba/ps2roms"]
+samba_rom_dirs = []  # ex: ["/mnt/usb-flash/PS2SMB"]
 # Polls consecutivos sem lock antes de fechar sessão samba (OPL pode liberar o lock brevemente durante boot)
 samba_debounce_polls = 3
 # Janela (segundos) para retomar a mesma sessão em vez de abrir uma nova, se o mesmo

@@ -3,19 +3,23 @@ import os
 import re
 import subprocess
 
-from daemon.watchers.procfs import is_rom_path
-
 logger = logging.getLogger(__name__)
+
+# O OPL só lê jogos de CD/ e DVD/ na raiz do share, e só .iso/.zso — qualquer
+# outro arquivo aberto (VMC, games.bin, ART, CFG) não é jogo.
+OPL_GAME_DIRS = ("CD", "DVD")
+OPL_EXTENSIONS = (".iso", ".zso")
 
 # smbstatus -L timestamp suffix: "Mon May 23 10:30:00 2026"
 _TIMESTAMP_RE = re.compile(r"\s+\w{3}\s+\w{3}\s+\d{1,2}\s+\d{2}:\d{2}:\d{2}\s+\d{4}\s*$")
 
 
-def parse_smbstatus_output(
-    output: str,
-    rom_dirs: list[str],
-    extensions: list[str],
-) -> str | None:
+def is_opl_game(relative_path: str) -> bool:
+    folder, sep, name = relative_path.partition("/")
+    return bool(sep) and folder in OPL_GAME_DIRS and name.lower().endswith(OPL_EXTENSIONS)
+
+
+def parse_smbstatus_output(output: str, rom_dirs: list[str]) -> str | None:
     past_header = False
     for line in output.splitlines():
         if line.startswith("---"):
@@ -31,13 +35,13 @@ def parse_smbstatus_output(
             filename = _TIMESTAMP_RE.sub("", rest).strip()
             if not filename:
                 continue
-            full_path = os.path.join(share_path, filename)
-            if is_rom_path(full_path, extensions, rom_dirs):
-                return full_path
+            relative = filename.lstrip("/")
+            if is_opl_game(relative):
+                return os.path.join(share_path, relative)
     return None
 
 
-def poll(rom_dirs: list[str], extensions: list[str]) -> tuple[str | None, str | None]:
+def poll(rom_dirs: list[str]) -> tuple[str | None, str | None]:
     if not rom_dirs:
         return None, None
     try:
@@ -49,7 +53,7 @@ def poll(rom_dirs: list[str], extensions: list[str]) -> tuple[str | None, str | 
         )
         if result.returncode != 0:
             return None, None
-        path = parse_smbstatus_output(result.stdout, rom_dirs, extensions)
+        path = parse_smbstatus_output(result.stdout, rom_dirs)
         if path:
             return path, "samba"
     except (subprocess.TimeoutExpired, FileNotFoundError, OSError):

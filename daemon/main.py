@@ -126,7 +126,7 @@ def polling_loop(
             file_path, source = procfs_poll(process_names, extensions, rom_dirs)
 
             if not file_path and samba_rom_dirs:
-                file_path, source = samba_poll(samba_rom_dirs, extensions)
+                file_path, source = samba_poll(samba_rom_dirs)
 
             if file_path:
                 consecutive_misses = 0
