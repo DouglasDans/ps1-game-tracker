@@ -82,7 +82,7 @@ function renderHeader(screen, params) {
       <div class="top-logo">
         <img src="/assets/psone-pro.svg" alt="PS one Pro">
       </div>
-      <div class="top-back" id="top-back">↑ VOLTAR AOS JOGOS</div>
+      <div class="top-back" id="top-back"><img src="assets/buttons/dpad-up.svg" alt=""> Voltar aos jogos</div>
       <span class="top-clock" id="clock"></span>`;
     const { back, backParams } = detailBackTarget(params);
     document.getElementById('top-back')?.addEventListener('click', () => navigate(back, backParams));

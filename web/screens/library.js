@@ -202,10 +202,10 @@ function buildHTML(platforms, games, selectedIndex, platformFilter, sortIndex) {
 
   return `<div class="screen-library">
     <aside class="side-rail">
-      <div class="rail-group-label">PLATAFORMA</div>
+      <div class="rail-group-label">Plataforma</div>
       ${railItems}
       <div class="rail-separator"></div>
-      <div class="rail-group-label">ORDENAR</div>
+      <div class="rail-group-label">Ordenar</div>
       <div class="rail-item rail-sort"><span class="msr">swap_vert</span>Ordenar: ${SORT_MODES[sortIndex].label}</div>
     </aside>
     <div class="library-main">

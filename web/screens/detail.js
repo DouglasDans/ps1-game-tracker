@@ -3,8 +3,8 @@ import { fmtTime, fmtDate, fmtDateShort, fmtSource, cardGradient, getPlatformLog
 
 const SCROLL_STEP = 240;
 const HEATMAP_DAYS = 91;
-const MONTH_LABELS = ['JAN', 'FEV', 'MAR', 'ABR', 'MAI', 'JUN', 'JUL', 'AGO', 'SET', 'OUT', 'NOV', 'DEZ'];
-const WEEKDAY_LABELS = ['SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB', 'DOM'];
+const MONTH_LABELS = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+const WEEKDAY_LABELS = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
 
 const TABS = [
   { key: 'overview', label: 'Visão geral' },
@@ -65,7 +65,7 @@ export function mount(container, navigate, params = {}) {
           if (e.key === 'ArrowDown') { e.preventDefault(); if (tabIndex < TABS.length - 1) setTab(tabIndex + 1); }
           if (e.key === 'ArrowUp') {
             e.preventDefault();
-            // Header reads "↑ VOLTAR AOS JOGOS" — pressing up past the first
+            // Header reads "Voltar aos jogos" (with a d-pad ↑ icon) — pressing up past the first
             // section exits Detail, matching that affordance.
             if (tabIndex > 0) setTab(tabIndex - 1);
             else navigate(back, backParams);
@@ -357,15 +357,15 @@ function buildStatsTab(d) {
         <div class="pg-panel-sub">${d.session_count} SESSÕES · ${countUniqueDays(sessions)} DIAS</div>
       </div>
       <div class="pg-panel span-2">
-        <div class="pg-panel-head"><span class="pg-panel-title">Frequência</span><span class="pg-panel-sub">ÚLTIMAS 13 SEMANAS</span></div>
+        <div class="pg-panel-head"><span class="pg-panel-title">Frequência</span><span class="pg-panel-sub">Últimas 13 semanas</span></div>
         <div class="heatmap-grid">${heatCells}</div>
       </div>
       <div class="pg-panel pace-panel">
         <div class="pg-panel-title">Ritmo</div>
         <div class="pace-value">${longest} dias</div>
-        <div class="pg-panel-sub">MAIOR SEQUÊNCIA</div>
+        <div class="pg-panel-sub">Maior sequência</div>
         <div class="pace-value">${perWeek}×</div>
-        <div class="pg-panel-sub">SESSÕES POR SEMANA</div>
+        <div class="pg-panel-sub">Sessões por semana</div>
       </div>
       <div class="pg-panel">
         <div class="pg-panel-title">Dia da semana</div>

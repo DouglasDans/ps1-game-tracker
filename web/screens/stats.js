@@ -238,14 +238,14 @@ function genreBars(games, limit) {
 function heatmapPanel(activity) {
   const byDay = activity?.by_day ?? [];
   if (!byDay.length) {
-    return panel('Atividade', `<div class="heatmap-empty">Sem dados de atividade diária.</div>`, 'ÚLTIMAS 13 SEMANAS');
+    return panel('Atividade', `<div class="heatmap-empty">Sem dados de atividade diária.</div>`, 'Últimas 13 semanas');
   }
   const maxDay = Math.max(...byDay.map(d => d.total_seconds), 1);
   const cells = byDay.map(d => {
     const opacity = d.total_seconds ? (0.12 + (d.total_seconds / maxDay) * 0.65).toFixed(2) : 0.05;
     return `<div class="heatmap-cell" style="background:rgba(255,255,255,${opacity})" title="${d.date}"></div>`;
   }).join('');
-  return panel('Atividade', `<div class="heatmap-grid">${cells}</div>`, 'ÚLTIMAS 13 SEMANAS');
+  return panel('Atividade', `<div class="heatmap-grid">${cells}</div>`, 'Últimas 13 semanas');
 }
 
 // Matches the mock: a label/value line with a thin progress bar underneath —
@@ -400,7 +400,7 @@ function buildLibraryTab(s, games) {
 }
 
 const MONTH_NAMES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
-const MONTH_SHORT = ['JAN', 'FEV', 'MAR', 'ABR', 'MAI', 'JUN', 'JUL', 'AGO', 'SET', 'OUT', 'NOV', 'DEZ'];
+const MONTH_SHORT = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
 
 function monthParts(key) {
   const [y, m] = key.split('-').map(Number);

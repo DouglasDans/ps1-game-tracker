@@ -109,7 +109,7 @@ function buildHTML(items, selectedIndex, active) {
       return `<div class="game-card card-library${sel}" data-idx="${i}">
         <div class="card-library-inner">
           <span class="msr">grid_view</span>
-          <span>BIBLIOTECA</span>
+          <span>Biblioteca</span>
         </div>
       </div>`;
     }
@@ -252,7 +252,7 @@ function updateHero(item, active, games) {
 
   if (item._lib) {
     badge.hidden = true;
-    platformInfo.innerHTML = 'TODOS OS JOGOS';
+    platformInfo.innerHTML = 'Todos os jogos';
     title.textContent = 'Biblioteca';
     summary.hidden = true;
     cta.hidden = true;
