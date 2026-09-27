@@ -1,3 +1,5 @@
+from datetime import date
+
 from daemon.db import (
     MIN_SESSION_S,
     upsert_game,
@@ -10,6 +12,7 @@ from daemon.db import (
     get_game_detail,
     get_games,
     get_longest_sessions,
+    get_monthly_stats,
     get_stats_summary,
     get_unenriched_games,
     update_game_enrichment,
@@ -889,3 +892,20 @@ def test_short_session_kept_in_database(conn):
     _played(conn, game_id, 30)
 
     assert conn.execute("SELECT COUNT(*) FROM sessions").fetchone()[0] == 1
+
+
+# --- get_monthly_stats ---
+
+def test_get_monthly_stats_groups_by_canonical_name_and_skips_short_sessions(conn):
+    id1 = upsert_game(conn, "/roms/Dino Crisis (Track 1).bin", "Dino Crisis", "PS1", "Dino Crisis")
+    id2 = upsert_game(conn, "/roms/Dino Crisis (Track 2).bin", "Dino Crisis", "PS1", "Dino Crisis")
+    tested = upsert_game(conn, "/roms/ctr.chd", "CTR", "PS1", "CTR")
+    _played(conn, id1, 600, started_at="2026-09-10 20:00:00")
+    _played(conn, id2, 900, started_at="2026-09-11 20:00:00")
+    _played(conn, tested, 30, started_at="2026-09-12 20:00:00")
+
+    month = get_monthly_stats(conn, today=date(2026, 9, 27))[0]
+
+    assert month["games_played"] == 1
+    assert month["top_games"][0]["display_name"] == "Dino Crisis"
+    assert month["top_games"][0]["total_seconds"] == 1500

@@ -82,3 +82,76 @@ def compute_activity_patterns(sessions: list[dict], today: date | None = None) -
         "current_streak": current,
         "longest_streak": longest,
     }
+
+
+# Mês atual + os 12 anteriores: o atual vai em destaque, os 12 fecham uma grade 6×2.
+MONTHLY_WINDOW = 13
+MONTHLY_TOP_GAMES = 3
+
+
+def _month_key(d: date) -> str:
+    return f"{d.year:04d}-{d.month:02d}"
+
+
+def compute_monthly(sessions: list[dict], today: date | None = None) -> list[dict]:
+    """Mês atual + 12 anteriores (mais recente primeiro), com jogo do mês e totais.
+
+    Cada sessão traz `game_key` (agrupa multi-track/multi-disco como a
+    playtime_summary) e os campos exibidos do jogo. `new_games` conta jogos
+    cuja primeira sessão de todo o histórico caiu naquele mês.
+    """
+    today = today or datetime.now(LOCAL_TZ).date()
+    months = []
+    y, m = today.year, today.month
+    for _ in range(MONTHLY_WINDOW):
+        months.append(f"{y:04d}-{m:02d}")
+        y, m = (y, m - 1) if m > 1 else (y - 1, 12)
+
+    first_month: dict[str, str] = {}
+    buckets: dict[str, dict] = {k: {"total": 0, "count": 0, "days": set(), "games": {}} for k in months}
+
+    for s in sessions:
+        started_at = s.get("started_at")
+        if not started_at:
+            continue
+        local_date = _to_local(started_at).date()
+        key = _month_key(local_date)
+        game_key = s["game_key"]
+        if key < first_month.get(game_key, "9999-99"):
+            first_month[game_key] = key
+
+        bucket = buckets.get(key)
+        if bucket is None:
+            continue
+        duration = s.get("duration_s") or 0
+        bucket["total"] += duration
+        bucket["count"] += 1
+        bucket["days"].add(local_date)
+        game = bucket["games"].setdefault(game_key, {
+            "id": s["game_id"],
+            "display_name": s["display_name"],
+            "platform": s["platform"],
+            "cover_url": s["cover_url"],
+            "total_seconds": 0,
+        })
+        game["total_seconds"] += duration
+        game["cover_url"] = game["cover_url"] or s["cover_url"]
+
+    new_by_month: dict[str, int] = {}
+    for key in first_month.values():
+        new_by_month[key] = new_by_month.get(key, 0) + 1
+
+    return [
+        {
+            "month": key,
+            "total_seconds": buckets[key]["total"],
+            "session_count": buckets[key]["count"],
+            "days_played": len(buckets[key]["days"]),
+            "games_played": len(buckets[key]["games"]),
+            "new_games": new_by_month.get(key, 0),
+            "top_games": sorted(
+                buckets[key]["games"].values(), key=lambda g: g["total_seconds"], reverse=True
+            )[:MONTHLY_TOP_GAMES],
+        }
+        for key in months
+    ]

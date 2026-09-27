@@ -1867,3 +1867,153 @@ body {
   background: rgba(255, 255, 255, 0.1);
   border-radius: 2px;
 }
+
+/* ── Stats · Mensal ─────────────────────────────────────────────────────
+   Hero (mês atual) + grade 6×2 dos 12 anteriores. Cada card herda a cor do
+   jogo do mês via tintByCover() em stats.js: fundo sólido no matiz da capa e
+   --accent-game nos valores de destaque. */
+.month-hero {
+  display: flex;
+  align-items: center;
+  gap: 36px;
+}
+
+.month-hero-cover {
+  position: relative;
+  flex-shrink: 0;
+  width: 150px;
+  height: 200px;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.month-hero-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.month-hero-name {
+  font-size: 48px;
+  font-weight: 800;
+  line-height: 1.05;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.month-hero-time {
+  font-size: 40px;
+  font-weight: 800;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: var(--accent-game, var(--accent));
+}
+
+.month-hero-others {
+  display: flex;
+  gap: 28px;
+  font-size: 20px;
+  color: rgba(255, 255, 255, 0.6);
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.month-hero-others b {
+  font-family: var(--font-mono);
+  font-weight: 400;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.month-hero-stats {
+  flex-shrink: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(190px, auto));
+  gap: 26px 44px;
+}
+
+.month-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.month-delta {
+  font-family: var(--font-mono);
+  font-size: 17px;
+  color: var(--accent-game, var(--accent));
+}
+
+.month-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 16px;
+}
+
+.month-card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+
+.month-card-body {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-width: 0;
+}
+
+.month-card-cover {
+  position: relative;
+  flex-shrink: 0;
+  width: 72px;
+  height: 96px;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.month-card-info {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.month-card-name {
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.15;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.month-card-time {
+  font-size: 26px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--accent-game, var(--accent));
+}
+
+.month-card-total {
+  font-family: var(--font-mono);
+  font-size: 15px;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.month-card-empty {
+  opacity: 0.45;
+}
+
+.month-empty-text {
+  color: var(--text-muted);
+  font-size: 20px;
+}
+
+.month-hero-name.month-empty-text {
+  font-size: 32px;
+}

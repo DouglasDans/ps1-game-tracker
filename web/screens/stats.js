@@ -1,9 +1,10 @@
-import { fetchGames, fetchStats, fetchActivity, fetchLongestSessions } from '../data/api.js';
-import { fmtTime, fmtDateShort, cardGradient, platformLogoImg } from '../utils.js';
+import { fetchGames, fetchStats, fetchActivity, fetchLongestSessions, fetchMonthly } from '../data/api.js';
+import { fmtTime, fmtDateShort, cardGradient, platformLogoImg, extractDominantColor, hueOf, hueOfName } from '../utils.js';
 
 const TABS = [
   { key: 'overview', label: 'Visão geral', icon: 'dashboard' },
   { key: 'activity', label: 'Atividade', icon: 'timeline' },
+  { key: 'monthly', label: 'Mensal', icon: 'calendar_month' },
   { key: 'library', label: 'Biblioteca', icon: 'grid_view' },
 ];
 
@@ -19,13 +20,14 @@ export function mount(container, navigate, params = {}) {
   const backdrop = document.getElementById('screen-backdrop');
   if (backdrop) backdrop.innerHTML = '<div class="stats-backdrop"></div>';
 
-  Promise.all([fetchGames(), fetchStats(), fetchActivity(), fetchLongestSessions(LONGEST_SESSIONS_MAX)])
-    .then(([games, stats, activity, longestSessions]) => {
+  Promise.all([fetchGames(), fetchStats(), fetchActivity(), fetchLongestSessions(LONGEST_SESSIONS_MAX), fetchMonthly()])
+    .then(([games, stats, activity, longestSessions, monthly]) => {
       if (cancelled) return;
 
       const content = {
         overview: buildOverview(stats, games, activity),
         activity: buildActivity(activity, longestSessions),
+        monthly: buildMonthly(monthly),
         library: buildLibraryTab(stats, games),
       };
 
@@ -37,16 +39,19 @@ export function mount(container, navigate, params = {}) {
         <aside class="side-rail">${rail}</aside>
         <div class="stats-content" id="stats-content">${content[TABS[tabIndex].key]}</div>
       </div>`;
-      fitTab();
+      onTabRendered();
 
-      // Ranked lists render a single row first, then grow to what fits the
-      // panel — see fitList().
-      function fitTab() {
+      // Post-render hook per tab: ranked lists render a single row first,
+      // then grow to what fits the panel (fitList); month cards pick up
+      // their game's color once the cover is sampled (tintByCover).
+      function onTabRendered() {
         const key = TABS[tabIndex].key;
         if (key === 'overview') {
           fitList('top-games-cell', 'top-games-list', n => topGamesList(games, n), Math.min(games.length, TOP_GAMES_MAX));
         } else if (key === 'activity') {
           fitList('longest-sessions-cell', 'longest-sessions-list', n => longestSessionsList(longestSessions.slice(0, n)), longestSessions.length);
+        } else if (key === 'monthly') {
+          tintByCover(document.getElementById('stats-content'));
         }
       }
 
@@ -63,7 +68,7 @@ export function mount(container, navigate, params = {}) {
         const el = document.getElementById('stats-content');
         el.innerHTML = content[TABS[tabIndex].key];
         el.scrollTo({ top: 0 });
-        fitTab();
+        onTabRendered();
       }
 
       container.querySelectorAll('.rail-item').forEach((el, i) => {
@@ -377,4 +382,117 @@ function buildLibraryTab(s, games) {
         ${panel('Por modo de jogo', `<div class="platform-bars">${gameModeBars}</div>`)}
       </div>
     </div>`;
+}
+
+const MONTH_NAMES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+const MONTH_SHORT = ['JAN', 'FEV', 'MAR', 'ABR', 'MAI', 'JUN', 'JUL', 'AGO', 'SET', 'OUT', 'NOV', 'DEZ'];
+
+function monthParts(key) {
+  const [y, m] = key.split('-').map(Number);
+  return { year: y, index: m - 1 };
+}
+
+function coverBox(game, cls) {
+  const img = game.cover_url ? `<img src="${game.cover_url}" alt="" class="cover-img">` : '';
+  return `<div class="${cls}" style="background:${cardGradient(game.display_name)}">${img}</div>`;
+}
+
+// data-cover/data-name feed tintByCover(): the card's background and accent
+// follow the game of the month, same color extraction as Home and Detail.
+function tintAttrs(game) {
+  return game ? `data-tint data-name="${game.display_name}" data-cover="${game.cover_url ?? ''}"` : '';
+}
+
+function monthDelta(current, previous) {
+  if (!previous?.total_seconds) return '';
+  const pct = Math.round(((current.total_seconds - previous.total_seconds) / previous.total_seconds) * 100);
+  const { index } = monthParts(previous.month);
+  const arrow = pct >= 0 ? '▲' : '▼';
+  return `<div class="month-delta">${arrow} ${Math.abs(pct)}% vs ${MONTH_NAMES[index].toLowerCase()}</div>`;
+}
+
+function monthHero(month, previous) {
+  const { year, index } = monthParts(month.month);
+  const [top, ...others] = month.top_games;
+  const label = `JOGO DO MÊS · ${MONTH_NAMES[index].toUpperCase()} ${year}`;
+
+  const main = top
+    ? `${coverBox(top, 'month-hero-cover')}
+      <div class="month-hero-main">
+        <div class="pg-panel-sub">${label}</div>
+        <div class="month-hero-name">${top.display_name}</div>
+        <div class="month-hero-time">${fmtTime(top.total_seconds)}</div>
+        ${others.length ? `<div class="month-hero-others">${others.map((g, i) =>
+          `<span>${i + 2}. ${g.display_name} <b>${fmtTime(g.total_seconds)}</b></span>`).join('')}</div>` : ''}
+      </div>`
+    : `<div class="month-hero-main">
+        <div class="pg-panel-sub">${label}</div>
+        <div class="month-hero-name month-empty-text">Nenhum jogo ainda este mês</div>
+      </div>`;
+
+  return `<div class="pg-panel month-hero" ${tintAttrs(top)}>
+    ${main}
+    <div class="month-hero-stats">
+      <div class="month-stat month-stat-total">
+        <div class="stats-card-label"><span class="msr">schedule</span>Tempo no mês</div>
+        <div class="stats-card-value">${fmtTime(month.total_seconds)}</div>
+        ${monthDelta(month, previous)}
+      </div>
+      <div class="month-stat">
+        <div class="stats-card-label"><span class="msr">videogame_asset</span>Jogos</div>
+        <div class="stats-card-value">${month.games_played}</div>
+      </div>
+      <div class="month-stat">
+        <div class="stats-card-label"><span class="msr">new_releases</span>Novos</div>
+        <div class="stats-card-value">${month.new_games}</div>
+      </div>
+      <div class="month-stat">
+        <div class="stats-card-label"><span class="msr">event</span>Dias</div>
+        <div class="stats-card-value">${month.days_played}</div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function monthCard(month) {
+  const { year, index } = monthParts(month.month);
+  const top = month.top_games[0];
+  const label = `<div class="pg-panel-sub">${MONTH_SHORT[index]} ${year}</div>`;
+  if (!top) {
+    return `<div class="pg-panel month-card month-card-empty">${label}<div class="month-empty-text">Sem jogos</div></div>`;
+  }
+  return `<div class="pg-panel month-card" ${tintAttrs(top)}>
+    ${label}
+    <div class="month-card-body">
+      ${coverBox(top, 'month-card-cover')}
+      <div class="month-card-info">
+        <div class="month-card-name">${top.display_name}</div>
+        <div class="month-card-time">${fmtTime(top.total_seconds)}</div>
+      </div>
+    </div>
+    <div class="month-card-total">${fmtTime(month.total_seconds)} no mês · ${month.games_played} jogos</div>
+  </div>`;
+}
+
+// Current month in the spotlight; the 12 before it as a 6×2 grid.
+function buildMonthly(months) {
+  if (!months?.length) return `<div class="heatmap-empty">Sem dados mensais.</div>`;
+  const [current, ...past] = months;
+  return `
+    ${monthHero(current, past[0])}
+    <div class="month-grid">${past.map(monthCard).join('')}</div>`;
+}
+
+function tintByCover(root) {
+  root?.querySelectorAll('[data-tint]').forEach(el => {
+    // Solid, darkened tone of the cover's hue — the raw cover color can be
+    // near-white (GT4) and would wash out the white text on top.
+    const apply = hue => {
+      el.style.background = `hsl(${hue} 45% 24%)`;
+      el.style.borderColor = `hsl(${hue} 45% 32%)`;
+      el.style.setProperty('--accent-game', `hsl(${hue} 80% 75%)`);
+    };
+    apply(hueOfName(el.dataset.name));
+    extractDominantColor(el.dataset.cover || null).then(c => { if (c) apply(hueOf(c)); });
+  });
 }

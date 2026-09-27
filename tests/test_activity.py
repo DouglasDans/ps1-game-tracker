@@ -1,6 +1,6 @@
 from datetime import date
 
-from daemon.activity import compute_activity_patterns, compute_streaks
+from daemon.activity import compute_activity_patterns, compute_monthly, compute_streaks
 
 
 def _session(started_at, duration_s=600):
@@ -138,3 +138,92 @@ def test_compute_streaks_longest_can_differ_from_current():
 
     assert current == 2
     assert longest == 5
+
+
+# --- compute_monthly ---
+
+def _play(started_at, duration_s=600, key="mgs", name="MGS", game_id=1, cover="c.jpg", platform="PS1"):
+    return {
+        "started_at": started_at, "duration_s": duration_s, "game_key": key,
+        "game_id": game_id, "display_name": name, "cover_url": cover, "platform": platform,
+    }
+
+
+def test_compute_monthly_returns_current_plus_12_months_newest_first():
+    result = compute_monthly([], today=date(2026, 9, 27))
+
+    assert [m["month"] for m in result][:3] == ["2026-09", "2026-08", "2026-07"]
+    assert len(result) == 13
+    assert result[-1]["month"] == "2025-09"
+
+
+def test_compute_monthly_empty_month_has_zeros():
+    result = compute_monthly([], today=date(2026, 9, 27))
+
+    assert result[0] == {
+        "month": "2026-09", "total_seconds": 0, "session_count": 0, "days_played": 0,
+        "games_played": 0, "new_games": 0, "top_games": [],
+    }
+
+
+def test_compute_monthly_converts_utc_to_local_month():
+    # 2026-09-01 02:00 UTC == 2026-08-31 23:00 America/Sao_Paulo → agosto
+    result = compute_monthly([_play("2026-09-01 02:00:00", 900)], today=date(2026, 9, 27))
+
+    by_month = {m["month"]: m for m in result}
+    assert by_month["2026-08"]["total_seconds"] == 900
+    assert by_month["2026-09"]["total_seconds"] == 0
+
+
+def test_compute_monthly_ranks_top_games_by_time():
+    sessions = [
+        _play("2026-09-10 20:00:00", 600, key="mgs", name="MGS", game_id=1),
+        _play("2026-09-11 20:00:00", 3000, key="gt4", name="GT4", game_id=2, platform="PS2"),
+        _play("2026-09-12 20:00:00", 900, key="ctr", name="CTR", game_id=3),
+        _play("2026-09-13 20:00:00", 300, key="dino", name="Dino", game_id=4),
+        _play("2026-09-14 20:00:00", 600, key="mgs", name="MGS", game_id=1),
+    ]
+
+    month = compute_monthly(sessions, today=date(2026, 9, 27))[0]
+
+    assert [g["display_name"] for g in month["top_games"]] == ["GT4", "MGS", "CTR"]
+    assert month["top_games"][0] == {
+        "id": 2, "display_name": "GT4", "platform": "PS2", "cover_url": "c.jpg", "total_seconds": 3000,
+    }
+    assert month["top_games"][1]["total_seconds"] == 1200
+    assert month["games_played"] == 4
+    assert month["session_count"] == 5
+    assert month["total_seconds"] == 5400
+
+
+def test_compute_monthly_counts_distinct_local_days():
+    sessions = [
+        _play("2026-09-10 12:00:00"),
+        _play("2026-09-10 20:00:00", key="gt4"),
+        _play("2026-09-11 12:00:00"),
+    ]
+
+    assert compute_monthly(sessions, today=date(2026, 9, 27))[0]["days_played"] == 2
+
+
+def test_compute_monthly_new_games_uses_first_session_ever():
+    # MGS estreou em agosto; em setembro só o GT4 é novo.
+    sessions = [
+        _play("2026-08-10 20:00:00", key="mgs"),
+        _play("2026-09-10 20:00:00", key="mgs"),
+        _play("2026-09-11 20:00:00", key="gt4"),
+    ]
+
+    by_month = {m["month"]: m for m in compute_monthly(sessions, today=date(2026, 9, 27))}
+    assert by_month["2026-08"]["new_games"] == 1
+    assert by_month["2026-09"]["new_games"] == 1
+
+
+def test_compute_monthly_new_games_counts_history_before_window():
+    # Estreia fora da janela não faz o jogo parecer novo dentro dela.
+    sessions = [
+        _play("2025-01-10 20:00:00", key="mgs"),
+        _play("2026-09-10 20:00:00", key="mgs"),
+    ]
+
+    assert compute_monthly(sessions, today=date(2026, 9, 27))[0]["new_games"] == 0
