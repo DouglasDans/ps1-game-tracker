@@ -319,7 +319,7 @@ function buildStatsTab(d) {
   const hours = computeHours(sessions);
   const { current, longest } = computeStreaks(sessions);
   const perWeek = computePerWeek(d);
-  const longestSessions = computeLongestSessions(sessions, 5);
+  const longestSessions = computeLongestSessions(sessions, 10);
 
   const monthBars = months.map(m => `
     <div class="wd-col">
