@@ -109,30 +109,54 @@ function renderHeader(screen, params) {
   updateClock();
 }
 
+// Keyed by the synthetic key the gamepad dispatches (see initGamepad).
+const BUTTON_ICONS = {
+  Enter: 'cross',
+  Escape: 'circle',
+  Triangle: 'triangle',
+  L1: 'l1',
+  R1: 'r1',
+  ArrowUp: 'dpad-up',
+  ArrowDown: 'dpad-down',
+  ArrowLeft: 'dpad-left',
+  ArrowRight: 'dpad-right',
+};
+
+function hint(keys, label) {
+  const icons = keys
+    .map(k => `<img class="hint-btn" src="assets/buttons/${BUTTON_ICONS[k]}.svg" alt="">`)
+    .join('');
+  return `<span class="hint">${icons} ${label}</span>`;
+}
+
 const SCREEN_HINTS = {
-  home: `
-    <span class="hint"><span class="hint-btn">✕</span><span class="hint-btn">↓</span> Detalhes</span>
-    <span class="hint"><span class="hint-btn">△</span> Biblioteca</span>
-    <span class="hint"><span class="hint-btn hint-btn-wide">R1</span> Estatísticas</span>`,
-  stats: `
-    <span class="hint"><span class="hint-btn">○</span> Voltar</span>
-    <span class="hint"><span class="hint-btn hint-btn-wide">L1</span> Jogos</span>
-    <span class="hint"><span class="hint-btn">↑</span><span class="hint-btn">↓</span> Abas</span>
-    <span class="hint"><span class="hint-btn">→</span> Rolar conteúdo</span>`,
-  library: `
-    <span class="hint"><span class="hint-btn">✕</span> Selecionar</span>
-    <span class="hint"><span class="hint-btn">○</span> Voltar</span>
-    <span class="hint"><span class="hint-btn">←</span> Filtros</span>
-    <span class="hint"><span class="hint-btn hint-btn-wide">L1</span><span class="hint-btn hint-btn-wide">R1</span> Filtro</span>`,
-  detail: `
-    <span class="hint"><span class="hint-btn">○</span> Voltar</span>
-    <span class="hint"><span class="hint-btn">↑</span><span class="hint-btn">↓</span> Seções</span>
-    <span class="hint"><span class="hint-btn">→</span> Rolar conteúdo</span>`,
+  home: [
+    hint(['Enter', 'ArrowDown'], 'Detalhes'),
+    hint(['Triangle'], 'Biblioteca'),
+    hint(['R1'], 'Estatísticas'),
+  ],
+  stats: [
+    hint(['Escape'], 'Voltar'),
+    hint(['L1'], 'Jogos'),
+    hint(['ArrowUp', 'ArrowDown'], 'Abas'),
+    hint(['ArrowRight'], 'Rolar conteúdo'),
+  ],
+  library: [
+    hint(['Enter'], 'Selecionar'),
+    hint(['Escape'], 'Voltar'),
+    hint(['ArrowLeft'], 'Filtros'),
+    hint(['L1', 'R1'], 'Filtro'),
+  ],
+  detail: [
+    hint(['Escape'], 'Voltar'),
+    hint(['ArrowUp', 'ArrowDown'], 'Seções'),
+    hint(['ArrowRight'], 'Rolar conteúdo'),
+  ],
 };
 
 function updateHints(screen) {
   const el = document.getElementById('bottom-hints');
-  if (el) el.innerHTML = SCREEN_HINTS[screen] ?? SCREEN_HINTS.home;
+  if (el) el.innerHTML = (SCREEN_HINTS[screen] ?? SCREEN_HINTS.home).join('');
 }
 
 function updateClock() {

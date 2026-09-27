@@ -245,24 +245,12 @@ body {
   color: rgba(255, 255, 255, 0.6);
 }
 
+/* SVG icons have mixed aspect ratios (face 1:1, L1/R1 wide, d-pad tall) —
+   fix the height and let width follow. */
 .hint-btn {
-  width: 34px;
   height: 34px;
-  border-radius: 50%;
-  border: 2px solid rgba(255, 255, 255, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 17px;
-  font-weight: 700;
-  flex-shrink: 0;
-  color: #fff;
-}
-
-.hint-btn-wide {
   width: auto;
-  padding: 0 14px;
-  border-radius: 17px;
+  flex-shrink: 0;
 }
 
 .bottom-status {

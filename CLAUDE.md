@@ -99,6 +99,7 @@ ps1-game-tracker/
 │   ├── data/
 │   │   └── api.js           # fetch da API (same-origin em prod; Pi em dev local)
 │   └── assets/              # logos de plataforma (ps1/ps2/psp/dc/sega)
+│       └── buttons/         # ícones de botão PS dos hints do rodapé (face = outline, resto = plain)
 ├── tests/
 │   ├── conftest.py
 │   ├── test_db.py
