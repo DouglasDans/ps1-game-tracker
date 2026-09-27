@@ -1417,7 +1417,6 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
-.ra-placeholder,
 .heatmap-empty {
   padding: 16px;
   background: rgba(255, 255, 255, 0.02);

@@ -11,8 +11,8 @@ Acesso via MCP: `mcp__claude_ai_Notion__notion-fetch` com a URL acima.
 
 Tudo numa interface única, navegada 100% por controle, na TV. Dois pilares, nesta ordem de prioridade:
 
-1. **Games** — informações e listas de jogos, horas por jogo, trackeamento completo de sessões, e o máximo de estatísticas qualitativas que os dados permitirem. A integração com **RetroAchievements (Fase 6) é prioridade** para o usuário.
-2. **Console** — informações do sistema do PS1 Pro: armazenamento, RAM, uso de CPU/GPU e configurações do sistema (escopo exato ainda a definir).
+1. **Games** — informações e listas de jogos, horas por jogo, trackeamento completo de sessões, e o máximo de estatísticas qualitativas que os dados permitirem. RetroAchievements saiu do roadmap (2026-09-27): muito esforço pra pouco retorno, já que o próprio emulador mostra as conquistas.
+2. **Console** — informações do sistema do PS1 Pro: armazenamento, RAM, uso de CPU/GPU e configurações do sistema (escopo exato ainda a definir). Telemetria já coletada pelo `sys-monitor` (temperatura, throttling, erros) entra aqui, numa futura aba de Ajustes — não nas estatísticas de jogo.
 
 ## O que é o PS1 Pro
 
@@ -288,7 +288,7 @@ curl -s http://192.168.1.150:9876/sessions/active | python3 -m json.tool
 | 3 — Enriquecimento      | ✅     | IGDB enricher (background thread, throttle, retry)                                              |
 | 4 — Frontend TV         | ✅     | Home/Detail/Library, Gamepad API, dark theme 10-foot, stats globais e por jogo                  |
 | 5 — Notion Sync         | ⬜     | Push sessão + cron diário                                                                       |
-| 6 — RetroAchievements   | ⬜     | **Prioridade.** Hash PS1 rcheevos-compatible + achievements + progresso                         |
+| 6 — RetroAchievements   | ❌     | Fora do roadmap (2026-09-27) — aba Conquistas removida do Detail; coluna `ra_game_id` mantida   |
 | 7 — Produção            | ⬜     | OSD Launcher integration + config completo                                                      |
 | 8 — Console info        | ⬜     | Novo pilar: armazenamento, RAM, uso de CPU/GPU, configs do sistema (escopo a detalhar)          |
 

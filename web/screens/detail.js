@@ -9,7 +9,6 @@ const WEEKDAY_LABELS = ['SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB', 'DOM'];
 const TABS = [
   { key: 'overview', label: 'Visão geral' },
   { key: 'stats', label: 'Estatísticas' },
-  { key: 'achievements', label: 'Conquistas' },
 ];
 
 export function mount(container, navigate, params = {}) {
@@ -34,7 +33,6 @@ export function mount(container, navigate, params = {}) {
       const content = {
         overview: buildOverviewTab(detail),
         stats: buildStatsTab(detail),
-        achievements: buildAchievementsTab(),
       };
 
       container.innerHTML = buildHTML(detail, content[TABS[tabIndex].key], tabIndex);
@@ -392,16 +390,6 @@ function buildStatsTab(d) {
         ${longestSessions.length
           ? `<div class="platform-bars">${longestSessionRows}</div>`
           : `<div class="heatmap-empty">Sem sessões registradas.</div>`}
-      </div>
-    </div>`;
-}
-
-function buildAchievementsTab() {
-  return `
-    <div class="stat-panel">
-      <div class="section-header">RetroAchievements</div>
-      <div class="ra-placeholder">
-        Fase 6 — integração com RetroAchievements não implementada ainda
       </div>
     </div>`;
 }
