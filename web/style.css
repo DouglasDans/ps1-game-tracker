@@ -1873,10 +1873,14 @@ body {
   gap: 36px;
 }
 
+/* Explicit height = .month-hero-stats (2 rows of label + value + delta),
+   the tallest item, so the cover fills the card's inner height. Not
+   align-self: stretch — the width would come from aspect-ratio before the
+   stretch resolves, and some engines render it 0 wide. */
 .month-hero-cover {
   position: relative;
   flex-shrink: 0;
-  align-self: stretch;
+  height: 201px;
   aspect-ratio: 3 / 4;
   border-radius: 10px;
   overflow: hidden;
