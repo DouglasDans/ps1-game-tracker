@@ -119,7 +119,7 @@ ps1-game-tracker/
 ## Padrões de código
 
 - **Tipagem**: type hints obrigatórios em todas as funções públicas
-- **Conexão SQLite**: sempre injetada como parâmetro (`conn: sqlite3.Connection`) — nunca singleton global
+- **Conexão SQLite**: sempre injetada como parâmetro (`conn: sqlite3.Connection`) — nunca singleton global. **Uma conexão por dono**: cada request abre a sua via `Depends(get_conn)` (`daemon/main.py`), a thread de polling e o enricher têm cada um a sua. Nunca compartilhar uma conexão entre threads — o `sqlite3` embaralha cursores concorrentes (respostas com linhas de outra query, `InterfaceError: another row available`, 500s); foi o bug da aba Mensal mostrando dados diferentes a cada F5 (2026-09-27), coberto por `test_stats_endpoints_stay_consistent_under_concurrent_requests`
 - **Threads**: polling loop em `threading.Thread(daemon=True)`, parado via `threading.Event`
 - **Config**: lida uma vez no startup via `tomllib` (Python 3.11+ stdlib) e passada como `dict`
 - **Imports**: stdlib → terceiros → internos, separados por linha em branco

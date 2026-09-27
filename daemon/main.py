@@ -4,10 +4,11 @@ import sqlite3
 import threading
 import time
 import tomllib
+from collections.abc import Iterator
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
@@ -171,7 +172,12 @@ def polling_loop(
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     config = load_config()
-    conn = make_conn(config["daemon"]["db_path"])
+    db_path = config["daemon"]["db_path"]
+    # This connection is owned by the startup code and then by the polling
+    # thread alone. The enricher and every request open their own (see
+    # get_conn): a sqlite3 connection used from several threads at once
+    # interleaves cursors — concurrent requests got each other's rows or 500s.
+    conn = make_conn(db_path)
     init_db(conn)
 
     recovered = crash_recovery(conn)
@@ -191,13 +197,14 @@ async def lifespan(app: FastAPI):
     manager = SessionManager(conn, resume_grace_s=resume_grace_s)
     stop_event = threading.Event()
     enrich_q: queue.Queue = queue.Queue()
-    app.state.conn = conn
+    app.state.db_path = db_path
     app.state.enrich_q = enrich_q
 
     for game in get_unenriched_games(conn):
         enrich_q.put(game)
     logger.info("Enrichment queue: %d game(s) pending", enrich_q.qsize())
 
+    enrich_conn = make_conn(db_path)
     poll_thread = threading.Thread(
         target=polling_loop,
         args=(manager, config, stop_event, conn, enrich_q),
@@ -206,7 +213,7 @@ async def lifespan(app: FastAPI):
     )
     enrich_thread = threading.Thread(
         target=enricher_loop,
-        args=(conn, config, stop_event, enrich_q),
+        args=(enrich_conn, config, stop_event, enrich_q),
         daemon=True,
         name="enricher",
     )
@@ -219,6 +226,7 @@ async def lifespan(app: FastAPI):
     stop_event.set()
     poll_thread.join(timeout=10)
     enrich_thread.join(timeout=10)
+    enrich_conn.close()
     conn.close()
     logger.info("Daemon stopped")
 
@@ -229,57 +237,64 @@ async def add_no_store_header(request, call_next):
     return response
 
 
+def get_conn(request: Request) -> Iterator[sqlite3.Connection]:
+    conn = make_conn(request.app.state.db_path)
+    try:
+        yield conn
+    finally:
+        conn.close()
+
+
 app = FastAPI(title="PS1 Game Tracker", lifespan=lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["GET", "POST"])
 app.middleware("http")(add_no_store_header)
 
 
 @app.get("/sessions/active")
-def active_session():
-    return get_active_session(app.state.conn)
+def active_session(conn: sqlite3.Connection = Depends(get_conn)):
+    return get_active_session(conn)
 
 
 @app.get("/games")
-def games():
-    return get_games(app.state.conn)
+def games(conn: sqlite3.Connection = Depends(get_conn)):
+    return get_games(conn)
 
 
 @app.get("/games/{game_id}")
-def game_detail(game_id: int):
-    result = get_game_detail(app.state.conn, game_id)
+def game_detail(game_id: int, conn: sqlite3.Connection = Depends(get_conn)):
+    result = get_game_detail(conn, game_id)
     if result is None:
         raise HTTPException(status_code=404, detail="Game not found")
     return result
 
 
 @app.get("/stats/summary")
-def stats_summary():
-    return get_stats_summary(app.state.conn)
+def stats_summary(conn: sqlite3.Connection = Depends(get_conn)):
+    return get_stats_summary(conn)
 
 
 @app.get("/stats/activity")
-def stats_activity():
-    return get_activity_stats(app.state.conn)
+def stats_activity(conn: sqlite3.Connection = Depends(get_conn)):
+    return get_activity_stats(conn)
 
 
 @app.get("/stats/monthly")
-def stats_monthly():
-    return get_monthly_stats(app.state.conn)
+def stats_monthly(conn: sqlite3.Connection = Depends(get_conn)):
+    return get_monthly_stats(conn)
 
 
 @app.get("/stats/monthly-series")
-def stats_monthly_series():
-    return get_monthly_series(app.state.conn)
+def stats_monthly_series(conn: sqlite3.Connection = Depends(get_conn)):
+    return get_monthly_series(conn)
 
 
 @app.get("/stats/longest-sessions")
-def stats_longest_sessions(limit: int = 10):
-    return get_longest_sessions(app.state.conn, limit=limit)
+def stats_longest_sessions(limit: int = 10, conn: sqlite3.Connection = Depends(get_conn)):
+    return get_longest_sessions(conn, limit=limit)
 
 
 @app.post("/admin/reset-enrichment")
-def admin_reset_enrichment():
-    conn = app.state.conn
+def admin_reset_enrichment(conn: sqlite3.Connection = Depends(get_conn)):
     n = reset_all_enrichment(conn)
     for game in get_unenriched_games(conn):
         app.state.enrich_q.put(game)
