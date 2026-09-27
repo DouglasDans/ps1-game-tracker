@@ -755,11 +755,25 @@ body {
   text-overflow: ellipsis;
 }
 
-.top-game-sub {
+/* Name + date on one line keeps a longest-session row as short as a
+   "Mais jogados" row, so 15 of them fit the Activity tab. */
+.top-game-head {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  min-width: 0;
+}
+
+/* Lets a long name shrink and ellipsize instead of pushing the date out. */
+.top-game-head .top-game-name {
+  min-width: 0;
+}
+
+.top-game-date {
   font-family: var(--font-mono);
   font-size: 15px;
   color: rgba(255, 255, 255, 0.4);
-  margin-top: 2px;
+  flex-shrink: 0;
 }
 
 .top-game-bar {

@@ -315,8 +315,10 @@ function longestSessionsList(sessions) {
       <span class="top-game-rank">${i + 1}</span>
       <div class="top-game-cover" style="background:${cardGradient(s.display_name)}">${cover}</div>
       <div class="top-game-info">
-        <div class="top-game-name">${s.display_name}</div>
-        <div class="top-game-sub">${fmtDateShort(s.started_at)}</div>
+        <div class="top-game-head">
+          <span class="top-game-name">${s.display_name}</span>
+          <span class="top-game-date">${fmtDateShort(s.started_at)}</span>
+        </div>
         <div class="top-game-bar"><div class="top-game-bar-fill" style="width:${pct}%"></div></div>
       </div>
       <div class="top-game-time">${fmtTime(s.duration_s)}</div>
