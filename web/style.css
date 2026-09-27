@@ -1642,11 +1642,40 @@ body {
   grid-column: span 4;
 }
 
+/* Fills whatever height .stats-content has left under the heatmap, so the
+   tab never scrolls — fitList() sizes "Sessões mais longas" to this height. */
 .stats-activity-row {
+  flex: 1;
+  min-height: 0;
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: minmax(0, 1fr);
   gap: 16px;
-  align-items: start;
+}
+
+.stats-activity-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-height: 0;
+}
+
+.stats-activity-cell > .pg-panel {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.stats-activity-side .weekday-chart {
+  flex: 1;
+  height: auto;
+  min-height: 0;
+}
+
+.stats-activity-side .period-rows {
+  flex: 1;
+  justify-content: space-around;
 }
 
 .stats-overview-side {

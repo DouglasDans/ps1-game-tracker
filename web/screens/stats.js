@@ -19,7 +19,7 @@ export function mount(container, navigate, params = {}) {
   const backdrop = document.getElementById('screen-backdrop');
   if (backdrop) backdrop.innerHTML = '<div class="stats-backdrop"></div>';
 
-  Promise.all([fetchGames(), fetchStats(), fetchActivity(), fetchLongestSessions()])
+  Promise.all([fetchGames(), fetchStats(), fetchActivity(), fetchLongestSessions(LONGEST_SESSIONS_MAX)])
     .then(([games, stats, activity, longestSessions]) => {
       if (cancelled) return;
 
@@ -37,7 +37,18 @@ export function mount(container, navigate, params = {}) {
         <aside class="side-rail">${rail}</aside>
         <div class="stats-content" id="stats-content">${content[TABS[tabIndex].key]}</div>
       </div>`;
-      if (TABS[tabIndex].key === 'overview') fitTopGamesList(games);
+      fitTab();
+
+      // Ranked lists render a single row first, then grow to what fits the
+      // panel — see fitList().
+      function fitTab() {
+        const key = TABS[tabIndex].key;
+        if (key === 'overview') {
+          fitList('top-games-cell', 'top-games-list', n => topGamesList(games, n), Math.min(games.length, TOP_GAMES_MAX));
+        } else if (key === 'activity') {
+          fitList('longest-sessions-cell', 'longest-sessions-list', n => longestSessionsList(longestSessions.slice(0, n)), longestSessions.length);
+        }
+      }
 
       function refreshRail() {
         container.querySelectorAll('.rail-item').forEach((el, j) => {
@@ -52,7 +63,7 @@ export function mount(container, navigate, params = {}) {
         const el = document.getElementById('stats-content');
         el.innerHTML = content[TABS[tabIndex].key];
         el.scrollTo({ top: 0 });
-        if (TABS[tabIndex].key === 'overview') fitTopGamesList(games);
+        fitTab();
       }
 
       container.querySelectorAll('.rail-item').forEach((el, i) => {
@@ -250,7 +261,7 @@ function weekdayCols(activity) {
     </div>`).join('');
 }
 
-// Upper bound once fitTopGamesList() fills the panel — plenty for any
+// Upper bound once fitList() fills the panel — plenty for any
 // realistic 1080p panel height.
 const TOP_GAMES_MAX = 20;
 
@@ -270,15 +281,14 @@ function buildOverview(s, games, activity) {
   </div>`;
 }
 
-// Grid stretches #top-games-cell's panel to match its taller sibling column
-// (Por plataforma + Por gênero stacked). buildOverview only renders a single
-// row so that stretch is driven by the sibling, not by the list itself —
-// rendering the full list up front would make "Mais jogados" the tallest
-// item and inflate the row height around its own content instead. Once
+// The cell's height is set by its surroundings (a taller sibling column on
+// Visão geral, the remaining screen height on Atividade), never by the list
+// itself — so the list is rendered with a single row first. Rendering it in
+// full up front would inflate the cell around its own content instead. Once
 // mounted, measure the real gap against that single row and fill it.
-function fitTopGamesList(games) {
-  const cell = document.getElementById('top-games-cell');
-  const list = document.getElementById('top-games-list');
+function fitList(cellId, listId, renderRows, total) {
+  const cell = document.getElementById(cellId);
+  const list = document.getElementById(listId);
   if (!cell || !list || !list.children.length) return;
 
   const panelEl = cell.firstElementChild;
@@ -293,8 +303,7 @@ function fitTopGamesList(games) {
   if (rowStep <= 0) return;
 
   const maxRows = Math.max(1, Math.floor(available / rowStep));
-  const count = Math.min(maxRows, games.length, TOP_GAMES_MAX);
-  list.innerHTML = topGamesList(games, count);
+  list.innerHTML = renderRows(Math.min(maxRows, total));
 }
 
 function longestSessionsList(sessions) {
@@ -315,20 +324,28 @@ function longestSessionsList(sessions) {
   }).join('');
 }
 
+// Upper bound once fitList() fills the panel.
+const LONGEST_SESSIONS_MAX = 15;
+
 function longestSessionsPanel(sessions) {
   const body = sessions?.length
-    ? `<div class="top-games-list">${longestSessionsList(sessions)}</div>`
+    ? `<div class="top-games-list" id="longest-sessions-list">${longestSessionsList(sessions.slice(0, 1))}</div>`
     : `<div class="heatmap-empty">Sem sessões registradas.</div>`;
   return panel('Sessões mais longas', body);
 }
 
+// Heatmap full width on top; below it two equal columns filling the rest of
+// the screen — longest sessions on the left, weekday + period of day
+// stretched to the same height on the right.
 function buildActivity(activity, longestSessions) {
   return `
     ${heatmapPanel(activity)}
     <div class="stats-activity-row">
-      ${panel('Dia da semana', `<div class="weekday-chart">${weekdayCols(activity)}</div>`)}
-      ${panel('Período do dia', `<div class="period-rows">${periodRows(activity)}</div>`)}
-      ${longestSessionsPanel(longestSessions)}
+      <div class="stats-activity-cell" id="longest-sessions-cell">${longestSessionsPanel(longestSessions)}</div>
+      <div class="stats-activity-cell stats-activity-side">
+        ${panel('Dia da semana', `<div class="weekday-chart">${weekdayCols(activity)}</div>`)}
+        ${panel('Período do dia', `<div class="period-rows">${periodRows(activity)}</div>`)}
+      </div>
     </div>`;
 }
 
