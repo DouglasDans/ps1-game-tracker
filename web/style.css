@@ -534,43 +534,6 @@ body {
   color: var(--accent-game, var(--accent));
 }
 
-.month-chart {
-  display: flex;
-  align-items: flex-end;
-  gap: 12px;
-  height: 150px;
-  margin-top: 22px;
-}
-
-.month-chart .wd-col {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
-  height: 100%;
-  gap: 10px;
-}
-
-.month-chart .wd-bar-wrap {
-  align-items: flex-end;
-}
-
-.month-chart .wd-bar {
-  width: 100%;
-  border-radius: 4px 4px 0 0;
-  background: var(--accent-game, var(--accent));
-  opacity: 0.85;
-}
-
-.month-chart .wd-label {
-  font-size: 16px;
-  font-weight: 400;
-  letter-spacing: normal;
-  text-transform: none;
-  color: rgba(255, 255, 255, 0.38);
-  text-align: center;
-}
-
 .pace-panel {
   display: flex;
   flex-direction: column;

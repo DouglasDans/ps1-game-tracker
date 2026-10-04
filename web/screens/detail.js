@@ -1,4 +1,5 @@
 import { fetchGameDetail } from '../data/api.js';
+import { lineAxes, lineFocus, lineScales } from '../charts.js';
 import { fmtTime, fmtDate, fmtDateShort, fmtSource, cardGradient, getPlatformLogo, extractDominantColor, localDateKey, localHour, localWeekdayMon0, hueOf, hueOfName, glowCGradient } from '../utils.js';
 
 const SCROLL_STEP = 240;
@@ -200,16 +201,37 @@ function toLocalDate(iso) {
   return new Date(iso.includes('Z') ? iso : iso + 'Z');
 }
 
-function computeMonths(sessions, year) {
-  const totals = Array(12).fill(0);
+// The last 12 months ending in the current one — a rolling window, so the
+// line never runs into empty future months or resets in January.
+function computeMonths(sessions, today = new Date()) {
+  const months = Array.from({ length: 12 }, (_, i) => {
+    const d = new Date(today.getFullYear(), today.getMonth() - 11 + i, 1);
+    return { year: d.getFullYear(), month: d.getMonth(), total: 0 };
+  });
   for (const s of sessions) {
     if (!s.started_at || !s.duration_s) continue;
     const dt = toLocalDate(s.started_at);
-    if (dt.getFullYear() !== year) continue;
-    totals[dt.getMonth()] += s.duration_s;
+    const m = months.find(m => m.year === dt.getFullYear() && m.month === dt.getMonth());
+    if (m) m.total += s.duration_s;
   }
-  const max = Math.max(...totals, 1);
-  return MONTH_LABELS.map((label, i) => ({ label, pct: Math.max(2, Math.round((totals[i] / max) * 100)) }));
+  return months;
+}
+
+const MONTH_BOX = { w: 900, h: 220, pad: { top: 34, right: 40, bottom: 40, left: 64 } };
+
+// Same line chart as Stats › Evolução, a single line in the game's color.
+function monthLineChart(months) {
+  const values = months.map(m => m.total);
+  const sc = lineScales(values, values.length, MONTH_BOX);
+  const xLabels = months.map((m, i) => ({
+    i,
+    text: `${MONTH_LABELS[m.month]}${i === 0 || m.month === 0 ? ` <tspan class="evo-axis-year">${m.year}</tspan>` : ''}`,
+  }));
+  const color = 'var(--accent-game, var(--accent))';
+  return `<svg class="evo-chart" viewBox="0 0 ${MONTH_BOX.w} ${MONTH_BOX.h}" role="img" aria-label="Tempo por mês">
+    ${lineAxes(sc, xLabels, MONTH_BOX)}
+    ${lineFocus(values, sc, color, () => true, (v, i) => v[i] > 0)}
+  </svg>`;
 }
 
 function computeWeekdays(sessions) {
@@ -312,20 +334,13 @@ function computeLongestSessions(sessions, limit) {
 
 function buildStatsTab(d) {
   const sessions = d.sessions ?? [];
-  const year = new Date().getFullYear();
-  const months = computeMonths(sessions, year);
+  const months = computeMonths(sessions);
   const heat = computeHeatmap(sessions, HEATMAP_DAYS);
   const weekdays = computeWeekdays(sessions);
   const hours = computeHours(sessions);
   const { current, longest } = computeStreaks(sessions);
   const perWeek = computePerWeek(d);
   const longestSessions = computeLongestSessions(sessions, 10);
-
-  const monthBars = months.map(m => `
-    <div class="wd-col">
-      <div class="wd-bar-wrap"><div class="wd-bar month-bar" style="height:${m.pct}%"></div></div>
-      <div class="wd-label">${m.label}</div>
-    </div>`).join('');
 
   const heatCells = heat.map(h => `<div class="heatmap-cell" style="background:rgba(255,255,255,${h.opacity})"></div>`).join('');
 
@@ -348,8 +363,8 @@ function buildStatsTab(d) {
   return `
     <div class="stats-grid-detail">
       <div class="pg-panel span-2">
-        <div class="pg-panel-head"><span class="pg-panel-title">Tempo por mês</span><span class="pg-panel-sub">${year}</span></div>
-        <div class="month-chart">${monthBars}</div>
+        <div class="pg-panel-head"><span class="pg-panel-title">Tempo por mês</span><span class="pg-panel-sub">Últimos 12 meses</span></div>
+        ${monthLineChart(months)}
       </div>
       <div class="pg-panel pg-panel-flex">
         <div class="pg-panel-title">Tempo total</div>

@@ -1,4 +1,5 @@
 import { fetchGames, fetchStats, fetchActivity, fetchLongestSessions, fetchMonthly, fetchMonthlySeries, fetchDailySeries } from '../data/api.js';
+import { lineAxes, lineFocus, linePath, lineScales } from '../charts.js';
 import { fmtTime, fmtDateShort, cardGradient, platformLogoImg, extractDominantColor, hueOf, hueOfName } from '../utils.js';
 
 const TABS = [
@@ -545,12 +546,7 @@ function tintByCover(root) {
 // same-franchise covers (GT2/3/4) from colliding. Both charts share this
 // code; a chart is { key, title, sub, n (x slots), xLabels, games[].values,
 // dotAt, labelAt } — values may stop before n (the month's future days).
-const EVO_W = 1100;
-const EVO_H = 300;
-const EVO_PAD = { top: 30, right: 56, bottom: 40, left: 72 };
-// Gridline steps: the smallest that keeps ≤ 5 lines, so a month that has
-// barely started (17 min) gets 15-min steps instead of one empty hour.
-const EVO_STEPS = [900, 1800, 3600, 7200, 10800, 18000, 36000, 72000];
+const EVO_BOX = { w: 1100, h: 300, pad: { top: 30, right: 56, bottom: 40, left: 72 } };
 const _seriesHue = new Map();
 
 // Top 10 of all time, hours per month, ranked by all-time total.
@@ -593,25 +589,7 @@ function monthChart(daily) {
 }
 
 function evoScales(chart) {
-  const peak = Math.max(1, ...chart.games.flatMap(g => g.values));
-  const step = EVO_STEPS.find(s => peak / s <= 5) ?? EVO_STEPS[EVO_STEPS.length - 1];
-  const max = Math.ceil(peak / step) * step;
-  const plotW = EVO_W - EVO_PAD.left - EVO_PAD.right;
-  const plotH = EVO_H - EVO_PAD.top - EVO_PAD.bottom;
-  return {
-    step, max,
-    x: i => EVO_PAD.left + (chart.n === 1 ? plotW / 2 : (i / (chart.n - 1)) * plotW),
-    y: secs => EVO_PAD.top + plotH - (secs / max) * plotH,
-  };
-}
-
-function evoPath(values, sc) {
-  return values.map((v, i) => `${i ? 'L' : 'M'}${sc.x(i).toFixed(1)},${sc.y(v).toFixed(1)}`).join('');
-}
-
-function axisLabel(secs) {
-  const h = Math.floor(secs / 3600), m = (secs % 3600) / 60;
-  return h && m ? `${h}h${m}` : m ? `${m}m` : `${h}h`;
+  return lineScales(chart.games.flatMap(g => g.values), chart.n, EVO_BOX);
 }
 
 function chartPanel(chart) {
@@ -620,16 +598,8 @@ function chartPanel(chart) {
     return `<div class="pg-panel evo-panel">${head}<div class="evo-empty month-empty-text">${chart.empty ?? 'Sem dados.'}</div></div>`;
   }
   const sc = evoScales(chart);
-  const grid = [];
-  for (let s = 0; s <= sc.max; s += sc.step) {
-    const y = sc.y(s).toFixed(1);
-    grid.push(`<line class="evo-grid" x1="${EVO_PAD.left}" x2="${EVO_W - EVO_PAD.right}" y1="${y}" y2="${y}"/>`,
-      `<text class="evo-axis" x="${EVO_PAD.left - 14}" y="${y}" text-anchor="end" dominant-baseline="middle">${axisLabel(s)}</text>`);
-  }
-  const labels = chart.xLabels.map(({ i, text }) =>
-    `<text class="evo-axis" x="${sc.x(i).toFixed(1)}" y="${EVO_H - 18}" text-anchor="middle">${text}</text>`).join('');
   const context = chart.games.map((g, i) =>
-    `<path class="evo-line" data-series="${i}" d="${evoPath(g.values, sc)}"/>`).join('');
+    `<path class="evo-line" data-series="${i}" d="${linePath(g.values, sc)}"/>`).join('');
 
   const legend = chart.games.map((g, i) => `
     <div class="evo-legend-row" data-series="${i}">
@@ -642,8 +612,8 @@ function chartPanel(chart) {
   return `<div class="pg-panel evo-panel" data-chart="${chart.key}">
     ${head}
     <div class="evo-body">
-      <svg class="evo-chart" viewBox="0 0 ${EVO_W} ${EVO_H}" role="img" aria-label="${chart.title}">
-        ${grid.join('')}${labels}
+      <svg class="evo-chart" viewBox="0 0 ${EVO_BOX.w} ${EVO_BOX.h}" role="img" aria-label="${chart.title}">
+        ${lineAxes(sc, chart.xLabels, EVO_BOX)}
         <g class="evo-context">${context}</g>
         <g class="evo-focus"></g>
       </svg>
@@ -667,15 +637,7 @@ function highlightSeries(chart, index, focused) {
 
   const draw = hue => {
     const color = `hsl(${hue} 80% 65%)`;
-    const points = game.values.map((v, i) => {
-      if (!chart.dotAt(game.values, i)) return '';
-      const x = sc.x(i).toFixed(1), y = sc.y(v).toFixed(1);
-      const label = chart.labelAt(game.values, i)
-        ? `<text class="evo-value" x="${x}" y="${(sc.y(v) - 16).toFixed(1)}" text-anchor="middle">${fmtTime(v)}</text>` : '';
-      return `<circle class="evo-dot" cx="${x}" cy="${y}" r="5" fill="${color}"/>${label}`;
-    }).join('');
-    root.querySelector('.evo-focus').innerHTML =
-      `<path class="evo-line-focus" d="${evoPath(game.values, sc)}" stroke="${color}"/>${points}`;
+    root.querySelector('.evo-focus').innerHTML = lineFocus(game.values, sc, color, chart.dotAt, chart.labelAt);
     root.querySelectorAll('.evo-legend-row').forEach(el => {
       if (+el.dataset.series === index) el.style.setProperty('--series-color', color);
     });
