@@ -9,6 +9,7 @@ from daemon.db import (
     crash_recovery,
     get_active_session,
     get_activity_stats,
+    get_daily_series,
     get_game_detail,
     get_games,
     get_longest_sessions,
@@ -922,3 +923,15 @@ def test_get_monthly_series_skips_short_sessions(conn):
 
     assert [g["display_name"] for g in result["games"]] == ["MGS"]
     assert result["games"][0]["monthly"] == [600]
+
+
+def test_get_daily_series_skips_short_sessions(conn):
+    played = upsert_game(conn, "/roms/mgs.chd", "MGS", "PS1", "MGS")
+    tested = upsert_game(conn, "/roms/ctr.chd", "CTR", "PS1", "CTR")
+    _played(conn, played, 600, started_at="2026-10-02 20:00:00")
+    _played(conn, tested, 30, started_at="2026-10-02 21:00:00")
+
+    result = get_daily_series(conn, today=date(2026, 10, 3))
+
+    assert [g["display_name"] for g in result["games"]] == ["MGS"]
+    assert result["games"][0]["daily"] == [0, 600, 0]

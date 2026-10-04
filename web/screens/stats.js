@@ -1,10 +1,11 @@
-import { fetchGames, fetchStats, fetchActivity, fetchLongestSessions, fetchMonthly, fetchMonthlySeries } from '../data/api.js';
+import { fetchGames, fetchStats, fetchActivity, fetchLongestSessions, fetchMonthly, fetchMonthlySeries, fetchDailySeries } from '../data/api.js';
 import { fmtTime, fmtDateShort, cardGradient, platformLogoImg, extractDominantColor, hueOf, hueOfName } from '../utils.js';
 
 const TABS = [
   { key: 'overview', label: 'Visão geral', icon: 'dashboard' },
   { key: 'activity', label: 'Atividade', icon: 'timeline' },
   { key: 'monthly', label: 'Mensal', icon: 'calendar_month' },
+  { key: 'evolution', label: 'Evolução', icon: 'timelapse' },
   { key: 'library', label: 'Biblioteca', icon: 'grid_view' },
 ];
 
@@ -13,7 +14,10 @@ const SCROLL_STEP = 240;
 export function mount(container, navigate, params = {}) {
   let tabIndex = Math.max(0, TABS.findIndex(t => t.key === params.tab));
   let focus = 'rail';
-  let seriesIndex = 0;
+  // Evolução: ↑↓ walks both legends as one list (10 + 10); each chart keeps
+  // its own highlighted game, the cursor marks which one has the focus.
+  let chartCursor = 0;
+  let chartSelection = [0, 0];
   let onKeyHandler = null;
   let cancelled = false;
 
@@ -21,15 +25,18 @@ export function mount(container, navigate, params = {}) {
   const backdrop = document.getElementById('screen-backdrop');
   if (backdrop) backdrop.innerHTML = '<div class="stats-backdrop"></div>';
 
-  Promise.all([fetchGames(), fetchStats(), fetchActivity(), fetchLongestSessions(LONGEST_SESSIONS_MAX), fetchMonthly(), fetchMonthlySeries()])
-    .then(([games, stats, activity, longestSessions, monthly, series]) => {
+  // The daily series is optional: a backend not yet restarted with the
+  // endpoint drops the month chart instead of the whole screen.
+  Promise.all([fetchGames(), fetchStats(), fetchActivity(), fetchLongestSessions(LONGEST_SESSIONS_MAX), fetchMonthly(), fetchMonthlySeries(), fetchDailySeries().catch(() => null)])
+    .then(([games, stats, activity, longestSessions, monthly, series, daily]) => {
       if (cancelled) return;
-      sortSeriesByCurrentMonth(series);
+      const charts = [monthChart(daily), historyChart(series)].filter(Boolean);
 
       const content = {
         overview: buildOverview(stats, games, activity),
         activity: buildActivity(activity, longestSessions),
-        monthly: buildMonthly(monthly, series),
+        monthly: buildMonthly(monthly),
+        evolution: buildEvolution(charts),
         library: buildLibraryTab(stats, games),
       };
 
@@ -54,7 +61,8 @@ export function mount(container, navigate, params = {}) {
           fitList('longest-sessions-cell', 'longest-sessions-list', n => longestSessionsList(longestSessions.slice(0, n)), longestSessions.length);
         } else if (key === 'monthly') {
           tintByCover(document.getElementById('stats-content'));
-          selectSeries(seriesIndex);
+        } else if (key === 'evolution') {
+          renderCharts();
         }
       }
 
@@ -78,12 +86,24 @@ export function mount(container, navigate, params = {}) {
         el.addEventListener('click', () => setTab(i));
       });
 
-      // Monthly tab: the evolution chart highlights one of the top-10 games;
-      // with focus in the content, ↑↓ moves the highlight instead of scrolling.
-      function selectSeries(i) {
-        if (!series?.games.length) return;
-        seriesIndex = Math.max(0, Math.min(series.games.length - 1, i));
-        highlightSeries(series, seriesIndex, focus === 'content');
+      function renderCharts() {
+        charts.forEach((chart, k) => {
+          if (chart.games.length) highlightSeries(chart, chartSelection[k], focus === 'content' && k === chartCursor);
+        });
+      }
+
+      // With focus in the content, ↑↓ moves the highlight instead of
+      // scrolling; past either end of a legend it crosses into the other chart.
+      function moveSelection(delta) {
+        const next = chartSelection[chartCursor] + delta;
+        const target = chartCursor + (next < 0 ? -1 : next >= charts[chartCursor].games.length ? 1 : 0);
+        if (target === chartCursor) {
+          chartSelection[chartCursor] = next;
+        } else if (charts[target]?.games.length) {
+          chartCursor = target;
+          chartSelection[target] = delta > 0 ? 0 : charts[target].games.length - 1;
+        }
+        renderCharts();
       }
 
       function onKey(e) {
@@ -93,15 +113,15 @@ export function mount(container, navigate, params = {}) {
         if (focus === 'rail') {
           if (e.key === 'ArrowDown') { e.preventDefault(); if (tabIndex < TABS.length - 1) setTab(tabIndex + 1); }
           if (e.key === 'ArrowUp')   { e.preventDefault(); if (tabIndex > 0) setTab(tabIndex - 1); }
-          if (e.key === 'ArrowRight') { focus = 'content'; refreshRail(); if (TABS[tabIndex].key === 'monthly') selectSeries(seriesIndex); }
+          if (e.key === 'ArrowRight') { focus = 'content'; refreshRail(); if (TABS[tabIndex].key === 'evolution') renderCharts(); }
           return;
         }
 
         // focus === 'content' — d-pad scrolls the tab body
-        if (e.key === 'ArrowLeft') { focus = 'rail'; refreshRail(); if (TABS[tabIndex].key === 'monthly') selectSeries(seriesIndex); return; }
-        if (TABS[tabIndex].key === 'monthly' && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
+        if (e.key === 'ArrowLeft') { focus = 'rail'; refreshRail(); if (TABS[tabIndex].key === 'evolution') renderCharts(); return; }
+        if (TABS[tabIndex].key === 'evolution' && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
           e.preventDefault();
-          selectSeries(seriesIndex + (e.key === 'ArrowDown' ? 1 : -1));
+          moveSelection(e.key === 'ArrowDown' ? 1 : -1);
           return;
         }
         if (!scroller) return;
@@ -490,16 +510,19 @@ function monthCard(month) {
   </div>`;
 }
 
-// Current month in the spotlight, the top-10 evolution chart, then the 12
-// months before it as a 6×2 grid.
-function buildMonthly(months, series) {
+// Current month in the spotlight, then the 12 months before it as a 6×2 grid.
+function buildMonthly(months) {
   if (!months?.length) return `<div class="heatmap-empty">Sem dados mensais.</div>`;
   const [current, ...past] = months;
   return `<div class="month-tab">
     ${monthHero(current, past[0])}
-    ${evolutionPanel(series)}
     <div class="month-grid">${past.map(monthCard).join('')}</div>
   </div>`;
+}
+
+// This month day by day on top, the all-time evolution below.
+function buildEvolution(charts) {
+  return `<div class="month-tab">${charts.map(chartPanel).join('')}</div>`;
 }
 
 function tintByCover(root) {
@@ -516,26 +539,69 @@ function tintByCover(root) {
   });
 }
 
-// ── Evolução: top 10 de todo o histórico, horas por mês ────────────────────
-// Emphasis chart: every game is a gray context line; only the selected one
-// is drawn in its cover color, labeled month by month. One colored line at a
-// time is what keeps same-franchise covers (GT2/3/4) from colliding.
+// ── Gráficos de evolução ──────────────────────────────────────────────────
+// Emphasis charts: every game is a gray context line; only the selected one
+// is drawn in its cover color. One colored line at a time is what keeps
+// same-franchise covers (GT2/3/4) from colliding. Both charts share this
+// code; a chart is { key, title, sub, n (x slots), xLabels, games[].values,
+// dotAt, labelAt } — values may stop before n (the month's future days).
 const EVO_W = 1100;
-const EVO_H = 250;
-const EVO_PAD = { top: 30, right: 56, bottom: 40, left: 64 };
+const EVO_H = 300;
+const EVO_PAD = { top: 30, right: 56, bottom: 40, left: 72 };
+// Gridline steps: the smallest that keeps ≤ 5 lines, so a month that has
+// barely started (17 min) gets 15-min steps instead of one empty hour.
+const EVO_STEPS = [900, 1800, 3600, 7200, 10800, 18000, 36000, 72000];
 const _seriesHue = new Map();
 
-function evoScales(series) {
-  const peak = Math.max(1, ...series.games.flatMap(g => g.monthly));
-  const stepH = peak / 3600 > 6 ? 2 : 1;
-  const maxH = Math.max(stepH, Math.ceil(peak / 3600 / stepH) * stepH);
-  const n = series.months.length;
+// Top 10 of all time, hours per month, ranked by all-time total.
+function historyChart(series) {
+  const months = series?.months ?? [];
+  return {
+    key: 'history',
+    title: 'Evolução geral',
+    sub: 'Top 10 do histórico · horas por mês',
+    n: months.length,
+    xLabels: months.map((m, i) => {
+      const { year, index } = monthParts(m);
+      const showYear = i === 0 || index === 0;
+      return { i, text: `${MONTH_SHORT[index]}${showYear ? ` <tspan class="evo-axis-year">${year}</tspan>` : ''}` };
+    }),
+    games: (series?.games ?? []).map(g => ({ ...g, values: g.monthly })),
+    dotAt: () => true,
+    labelAt: (values, i) => values[i] > 0,
+  };
+}
+
+// Top 10 of the current month, cumulative hours day by day: the lines only
+// rise on session days, so leads and overtakes read at a glance.
+function monthChart(daily) {
+  if (!daily) return null;
+  const { index } = monthParts(daily.month);
+  const n = daily.days_in_month;
+  const cumulative = values => { let sum = 0; return values.map(v => (sum += v)); };
+  return {
+    key: 'month',
+    title: `${MONTH_NAMES[index]} dia a dia`,
+    sub: 'Top 10 do mês · horas acumuladas',
+    empty: 'Nenhum jogo ainda este mês',
+    n,
+    xLabels: [1, 5, 10, 15, 20, 25, n].map(d => ({ i: d - 1, text: String(d) })),
+    games: daily.games.map(g => ({ ...g, values: cumulative(g.daily) })),
+    dotAt: (values, i) => values[i] > (i ? values[i - 1] : 0),
+    labelAt: (values, i) => i === values.length - 1,
+  };
+}
+
+function evoScales(chart) {
+  const peak = Math.max(1, ...chart.games.flatMap(g => g.values));
+  const step = EVO_STEPS.find(s => peak / s <= 5) ?? EVO_STEPS[EVO_STEPS.length - 1];
+  const max = Math.ceil(peak / step) * step;
   const plotW = EVO_W - EVO_PAD.left - EVO_PAD.right;
   const plotH = EVO_H - EVO_PAD.top - EVO_PAD.bottom;
   return {
-    stepH, maxH,
-    x: i => EVO_PAD.left + (n === 1 ? plotW / 2 : (i / (n - 1)) * plotW),
-    y: secs => EVO_PAD.top + plotH - (secs / 3600 / maxH) * plotH,
+    step, max,
+    x: i => EVO_PAD.left + (chart.n === 1 ? plotW / 2 : (i / (chart.n - 1)) * plotW),
+    y: secs => EVO_PAD.top + plotH - (secs / max) * plotH,
   };
 }
 
@@ -543,43 +609,40 @@ function evoPath(values, sc) {
   return values.map((v, i) => `${i ? 'L' : 'M'}${sc.x(i).toFixed(1)},${sc.y(v).toFixed(1)}`).join('');
 }
 
-// The 10 games are the all-time top, but the legend ranks and labels them by
-// the current month (the last entry of `monthly`), ties by all-time total.
-// Sorted in place once, so lines, legend and ↑↓ selection share one order.
-function sortSeriesByCurrentMonth(series) {
-  const current = g => g.monthly[g.monthly.length - 1] ?? 0;
-  series?.games.sort((a, b) => current(b) - current(a) || b.total_seconds - a.total_seconds);
+function axisLabel(secs) {
+  const h = Math.floor(secs / 3600), m = (secs % 3600) / 60;
+  return h && m ? `${h}h${m}` : m ? `${m}m` : `${h}h`;
 }
 
-function evolutionPanel(series) {
-  if (!series?.games.length) return '';
-  const sc = evoScales(series);
-  const grid = [];
-  for (let h = 0; h <= sc.maxH; h += sc.stepH) {
-    const y = sc.y(h * 3600).toFixed(1);
-    grid.push(`<line class="evo-grid" x1="${EVO_PAD.left}" x2="${EVO_W - EVO_PAD.right}" y1="${y}" y2="${y}"/>`,
-      `<text class="evo-axis" x="${EVO_PAD.left - 14}" y="${y}" text-anchor="end" dominant-baseline="middle">${h}h</text>`);
+function chartPanel(chart) {
+  const head = `<div class="pg-panel-head"><span class="pg-panel-title">${chart.title}</span><span class="pg-panel-sub">${chart.sub}</span></div>`;
+  if (!chart.games.length) {
+    return `<div class="pg-panel evo-panel">${head}<div class="evo-empty month-empty-text">${chart.empty ?? 'Sem dados.'}</div></div>`;
   }
-  const labels = series.months.map((m, i) => {
-    const { year, index } = monthParts(m);
-    const showYear = i === 0 || index === 0;
-    return `<text class="evo-axis" x="${sc.x(i).toFixed(1)}" y="${EVO_H - 18}" text-anchor="middle">${MONTH_SHORT[index]}${showYear ? ` <tspan class="evo-axis-year">${year}</tspan>` : ''}</text>`;
-  }).join('');
-  const context = series.games.map((g, i) =>
-    `<path class="evo-line" data-series="${i}" d="${evoPath(g.monthly, sc)}"/>`).join('');
+  const sc = evoScales(chart);
+  const grid = [];
+  for (let s = 0; s <= sc.max; s += sc.step) {
+    const y = sc.y(s).toFixed(1);
+    grid.push(`<line class="evo-grid" x1="${EVO_PAD.left}" x2="${EVO_W - EVO_PAD.right}" y1="${y}" y2="${y}"/>`,
+      `<text class="evo-axis" x="${EVO_PAD.left - 14}" y="${y}" text-anchor="end" dominant-baseline="middle">${axisLabel(s)}</text>`);
+  }
+  const labels = chart.xLabels.map(({ i, text }) =>
+    `<text class="evo-axis" x="${sc.x(i).toFixed(1)}" y="${EVO_H - 18}" text-anchor="middle">${text}</text>`).join('');
+  const context = chart.games.map((g, i) =>
+    `<path class="evo-line" data-series="${i}" d="${evoPath(g.values, sc)}"/>`).join('');
 
-  const legend = series.games.map((g, i) => `
-    <div class="evo-legend-row" data-series="${i}" data-name="${g.display_name}" data-cover="${g.cover_url ?? ''}">
+  const legend = chart.games.map((g, i) => `
+    <div class="evo-legend-row" data-series="${i}">
       <span class="evo-key"></span>
       ${coverBox(g, 'top-game-cover')}
       <span class="evo-legend-name">${g.display_name}</span>
-      <span class="evo-legend-time">${fmtTime(g.monthly[g.monthly.length - 1] ?? 0)}</span>
+      <span class="evo-legend-time">${fmtTime(g.total_seconds)}</span>
     </div>`).join('');
 
-  return `<div class="pg-panel evo-panel">
-    <div class="pg-panel-head"><span class="pg-panel-title">Evolução</span><span class="pg-panel-sub">Top 10 · horas em ${MONTH_NAMES[monthParts(series.months[series.months.length - 1]).index].toLowerCase()}</span></div>
+  return `<div class="pg-panel evo-panel" data-chart="${chart.key}">
+    ${head}
     <div class="evo-body">
-      <svg class="evo-chart" viewBox="0 0 ${EVO_W} ${EVO_H}" role="img" aria-label="Horas por mês dos 10 jogos mais jogados">
+      <svg class="evo-chart" viewBox="0 0 ${EVO_W} ${EVO_H}" role="img" aria-label="${chart.title}">
         ${grid.join('')}${labels}
         <g class="evo-context">${context}</g>
         <g class="evo-focus"></g>
@@ -589,14 +652,14 @@ function evolutionPanel(series) {
   </div>`;
 }
 
-function highlightSeries(series, index, focused) {
-  const svg = document.querySelector('.evo-chart');
-  if (!svg) return;
-  const game = series.games[index];
-  const sc = evoScales(series);
+function highlightSeries(chart, index, focused) {
+  const root = document.querySelector(`[data-chart="${chart.key}"]`);
+  if (!root) return;
+  const game = chart.games[index];
+  const sc = evoScales(chart);
 
-  svg.querySelectorAll('.evo-line').forEach(el => el.classList.toggle('dim', +el.dataset.series !== index));
-  document.querySelectorAll('.evo-legend-row').forEach(el => {
+  root.querySelectorAll('.evo-line').forEach(el => el.classList.toggle('dim', +el.dataset.series !== index));
+  root.querySelectorAll('.evo-legend-row').forEach(el => {
     const on = +el.dataset.series === index;
     el.classList.toggle('active', on);
     el.classList.toggle('focused', on && focused);
@@ -604,14 +667,16 @@ function highlightSeries(series, index, focused) {
 
   const draw = hue => {
     const color = `hsl(${hue} 80% 65%)`;
-    const points = game.monthly.map((v, i) => {
+    const points = game.values.map((v, i) => {
+      if (!chart.dotAt(game.values, i)) return '';
       const x = sc.x(i).toFixed(1), y = sc.y(v).toFixed(1);
-      const label = v ? `<text class="evo-value" x="${x}" y="${(sc.y(v) - 16).toFixed(1)}" text-anchor="middle">${fmtTime(v)}</text>` : '';
+      const label = chart.labelAt(game.values, i)
+        ? `<text class="evo-value" x="${x}" y="${(sc.y(v) - 16).toFixed(1)}" text-anchor="middle">${fmtTime(v)}</text>` : '';
       return `<circle class="evo-dot" cx="${x}" cy="${y}" r="5" fill="${color}"/>${label}`;
     }).join('');
-    svg.querySelector('.evo-focus').innerHTML =
-      `<path class="evo-line-focus" d="${evoPath(game.monthly, sc)}" stroke="${color}"/>${points}`;
-    document.querySelectorAll('.evo-legend-row').forEach(el => {
+    root.querySelector('.evo-focus').innerHTML =
+      `<path class="evo-line-focus" d="${evoPath(game.values, sc)}" stroke="${color}"/>${points}`;
+    root.querySelectorAll('.evo-legend-row').forEach(el => {
       if (+el.dataset.series === index) el.style.setProperty('--series-color', color);
     });
   };
@@ -622,7 +687,7 @@ function highlightSeries(series, index, focused) {
     extractDominantColor(game.cover_url).then(c => {
       if (!c) return;
       _seriesHue.set(key, hueOf(c));
-      if (document.querySelector('.evo-legend-row.active')?.dataset.series === String(index)) draw(hueOf(c));
+      if (root.querySelector('.evo-legend-row.active')?.dataset.series === String(index)) draw(hueOf(c));
     });
   }
 }

@@ -1,6 +1,12 @@
 from datetime import date
 
-from daemon.activity import compute_activity_patterns, compute_monthly, compute_monthly_series, compute_streaks
+from daemon.activity import (
+    compute_activity_patterns,
+    compute_daily_series,
+    compute_monthly,
+    compute_monthly_series,
+    compute_streaks,
+)
 
 
 def _session(started_at, duration_s=600):
@@ -273,6 +279,51 @@ def test_compute_monthly_series_keeps_top_10_by_total_time():
     ]
 
     games = compute_monthly_series(sessions, today=date(2026, 9, 27))["games"]
+
+    assert len(games) == 10
+    assert [g["display_name"] for g in games[:2]] == ["G11", "G10"]
+    assert "G0" not in [g["display_name"] for g in games]
+
+
+# --- compute_daily_series ---
+
+def test_compute_daily_series_covers_current_month_up_to_today():
+    result = compute_daily_series([], today=date(2026, 10, 3))
+
+    assert result == {"month": "2026-10", "days_in_month": 31, "games": []}
+
+
+def test_compute_daily_series_one_value_per_local_day_until_today():
+    # 2026-10-03 01:00 UTC == 2026-10-02 22:00 America/Sao_Paulo → dia 2
+    sessions = [
+        _play("2026-10-01 20:00:00", 600),
+        _play("2026-10-03 01:00:00", 300),
+        _play("2026-10-02 20:00:00", 900),
+    ]
+
+    game = compute_daily_series(sessions, today=date(2026, 10, 3))["games"][0]
+
+    assert game["daily"] == [600, 1200, 0]
+    assert game["total_seconds"] == 1800
+    assert game == {**game, "id": 1, "display_name": "MGS", "platform": "PS1", "cover_url": "c.jpg"}
+
+
+def test_compute_daily_series_ignores_other_months():
+    # 2026-10-01 02:00 UTC == 2026-09-30 23:00 local → setembro, fora
+    sessions = [_play("2026-10-01 02:00:00", 600), _play("2026-08-10 20:00:00", 600)]
+
+    assert compute_daily_series(sessions, today=date(2026, 10, 3))["games"] == []
+
+
+def test_compute_daily_series_keeps_top_10_of_the_month():
+    sessions = [
+        _play("2026-10-02 20:00:00", 1000 + i, key=f"g{i}", name=f"G{i}", game_id=i)
+        for i in range(12)
+    ]
+    # Muito jogado no histórico, pouco no mês: não entra.
+    sessions.append(_play("2026-09-10 20:00:00", 99999, key="g0", name="G0", game_id=0))
+
+    games = compute_daily_series(sessions, today=date(2026, 10, 3))["games"]
 
     assert len(games) == 10
     assert [g["display_name"] for g in games[:2]] == ["G11", "G10"]

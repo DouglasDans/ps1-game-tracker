@@ -16,6 +16,7 @@ from daemon.db import (
     crash_recovery,
     get_active_session,
     get_activity_stats,
+    get_daily_series,
     get_game_detail,
     get_games,
     get_longest_sessions,
@@ -286,6 +287,11 @@ def stats_monthly(conn: sqlite3.Connection = Depends(get_conn)):
 @app.get("/stats/monthly-series")
 def stats_monthly_series(conn: sqlite3.Connection = Depends(get_conn)):
     return get_monthly_series(conn)
+
+
+@app.get("/stats/daily-series")
+def stats_daily_series(conn: sqlite3.Connection = Depends(get_conn)):
+    return get_daily_series(conn)
 
 
 @app.get("/stats/longest-sessions")

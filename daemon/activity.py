@@ -1,3 +1,4 @@
+import calendar
 from datetime import date, datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
@@ -205,4 +206,45 @@ def compute_monthly_series(sessions: list[dict], today: date | None = None) -> d
             }
             for g in top
         ],
+    }
+
+
+DAILY_TOP_GAMES = 10
+
+
+def compute_daily_series(sessions: list[dict], today: date | None = None) -> dict:
+    """Segundos por dia dos 10 jogos mais jogados no mês atual.
+
+    `daily` vai do dia 1 até hoje (um valor por dia local); `days_in_month`
+    permite desenhar o eixo do mês inteiro com os dias futuros vazios.
+    """
+    today = today or datetime.now(LOCAL_TZ).date()
+    current = _month_key(today)
+    per_game: dict[str, dict] = {}
+
+    for s in sessions:
+        started_at = s.get("started_at")
+        if not started_at:
+            continue
+        local_date = _to_local(started_at).date()
+        if _month_key(local_date) != current or local_date > today:
+            continue
+        game = per_game.setdefault(s["game_key"], {
+            "id": s["game_id"],
+            "display_name": s["display_name"],
+            "platform": s["platform"],
+            "cover_url": s["cover_url"],
+            "total_seconds": 0,
+            "daily": [0] * today.day,
+        })
+        duration = s.get("duration_s") or 0
+        game["total_seconds"] += duration
+        game["daily"][local_date.day - 1] += duration
+        game["cover_url"] = game["cover_url"] or s["cover_url"]
+
+    top = sorted(per_game.values(), key=lambda g: g["total_seconds"], reverse=True)[:DAILY_TOP_GAMES]
+    return {
+        "month": current,
+        "days_in_month": calendar.monthrange(today.year, today.month)[1],
+        "games": top,
     }

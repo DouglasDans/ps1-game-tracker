@@ -1,7 +1,7 @@
 import sqlite3
 from datetime import date
 
-from daemon.activity import compute_activity_patterns, compute_monthly, compute_monthly_series
+from daemon.activity import compute_activity_patterns, compute_daily_series, compute_monthly, compute_monthly_series
 
 # Sessões mais curtas que isso são "abri pra testar" — ficam no banco, mas
 # fora de todas as estatísticas (via view played_sessions).
@@ -459,6 +459,10 @@ def get_monthly_stats(conn: sqlite3.Connection, today: date | None = None) -> li
 
 def get_monthly_series(conn: sqlite3.Connection, today: date | None = None) -> dict:
     return compute_monthly_series(_monthly_rows(conn), today=today)
+
+
+def get_daily_series(conn: sqlite3.Connection, today: date | None = None) -> dict:
+    return compute_daily_series(_monthly_rows(conn), today=today)
 
 
 def get_longest_sessions(conn: sqlite3.Connection, limit: int = 10) -> list[dict]:

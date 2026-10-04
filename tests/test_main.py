@@ -54,6 +54,7 @@ STATS_PATHS = [
     "/stats/longest-sessions?limit=10",
     "/stats/monthly",
     "/stats/monthly-series",
+    "/stats/daily-series",
 ]
 
 

@@ -1853,7 +1853,8 @@ body {
    Hero (mês atual) + grade 6×2 dos 12 anteriores. Cada card herda a cor do
    jogo do mês via tintByCover() em stats.js: fundo sólido no matiz da capa e
    --accent-game nos valores de destaque. */
-/* Tighter than .stats-content's 32px gap: hero + chart + 2-row grid must fit one screen. */
+/* Tighter than .stats-content's 32px gap: hero + 2-row grid (Mensal) and
+   the two charts (Evolução) must each fit one screen. */
 .month-tab {
   display: flex;
   flex-direction: column;
@@ -2017,6 +2018,11 @@ body {
 
 .month-hero-name.month-empty-text {
   font-size: 32px;
+}
+
+.evo-empty {
+  padding: 48px 0;
+  text-align: center;
 }
 
 /* Evolução — gráfico de ênfase: 10 linhas cinza de contexto, uma na cor do
