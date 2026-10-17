@@ -258,3 +258,39 @@ def test_igdb_search_handles_missing_cover():
     assert result["developer"] is None
     assert result["publisher"] is None
     assert result["game_modes"] is None
+
+
+def _search_with(results, name, platform):
+    mock_resp = MagicMock()
+    mock_resp.json.return_value = results
+    mock_resp.raise_for_status = MagicMock()
+    with patch("daemon.enricher.requests.post", return_value=mock_resp) as mock_post:
+        return _igdb_search(name, platform, "tok", "cid"), mock_post.call_args[1]["data"]
+
+
+def test_igdb_search_prefers_original_release_among_exact_names():
+    # IGDB tem dois "Sonic the Hedgehog 3" no Mega Drive: o de 2024 (filme) vem primeiro
+    results = [
+        {"id": 375301, "name": "Sonic the Hedgehog 3", "first_release_date": 1727740800},  # 2024
+        {"id": 6797, "name": "Sonic the Hedgehog 3", "first_release_date": 760320000},     # 1994
+        {"id": 11219, "name": "Sonic the Hedgehog 3 & Knuckles", "first_release_date": 782870400},
+    ]
+    result, _ = _search_with(results, "Sonic the Hedgehog 3", "Mega Drive")
+    assert result["igdb_id"] == 6797
+    assert result["release_year"] == 1994
+
+
+def test_igdb_search_maps_mega_cd_platform_name():
+    _, body = _search_with([{"id": 1, "name": "Sonic CD"}], "Sonic CD", "Mega-CD - Sega CD")
+    assert "where platforms = (78)" in body
+
+
+def test_igdb_search_without_platform_keeps_first_exact_match():
+    # sem plataforma, as exatas são consoles diferentes: o mais antigo trocaria o jogo
+    results = [
+        {"id": 2009, "name": "Gran Turismo", "first_release_date": 1254355200},  # PSP 2009
+        {"id": 1594, "name": "Gran Turismo", "first_release_date": 882230400},   # PS1 1997
+    ]
+    result, body = _search_with(results, "Gran Turismo", None)
+    assert "where platforms" not in body
+    assert result["igdb_id"] == 2009

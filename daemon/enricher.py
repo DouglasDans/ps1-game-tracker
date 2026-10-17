@@ -51,6 +51,7 @@ _IGDB_PLATFORM_IDS: dict[str, int] = {
     "Game Gear": 35,
     "32X": 30,
     "Sega CD": 78,
+    "Mega-CD - Sega CD": 78,  # nome com que os jogos do RetroArch chegam no banco
     # Others
     "MSX": 27,
     "MSX2": 53,
@@ -143,8 +144,18 @@ def _igdb_search(
     if not results:
         return None
 
+    # Mesmo nome exato pode ter várias entradas (relançamentos, tie-ins): o
+    # IGDB lista "Sonic the Hedgehog 3" de 2024 antes do original de 1994 no
+    # Mega Drive. Com a plataforma filtrada, entre as exatas fica a de
+    # lançamento mais antigo. Sem plataforma, não: as exatas são o mesmo nome
+    # em consoles diferentes (Gran Turismo PS1 1997 vs PSP 2009), e "o mais
+    # antigo" trocaria o jogo — fica a primeira, como antes.
     canonical_lower = canonical_name.lower()
-    game = next((r for r in results if r["name"].lower() == canonical_lower), results[0])
+    exact = [r for r in results if r["name"].lower() == canonical_lower]
+    if exact and platform_id:
+        game = min(exact, key=lambda r: r.get("first_release_date", float("inf")))
+    else:
+        game = exact[0] if exact else results[0]
     cover_url = None
     if "cover" in game:
         cover_url = f"https://images.igdb.com/igdb/image/upload/t_cover_big/{game['cover']['image_id']}.jpg"
