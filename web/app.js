@@ -143,7 +143,8 @@ const SCREEN_HINTS = {
   system: [
     hint(['Escape'], 'Voltar'),
     hint(['L1'], 'Estatísticas'),
-    hint(['ArrowRight'], 'Rolar conteúdo'),
+    hint(['ArrowUp', 'ArrowDown'], 'Abas'),
+    hint(['ArrowRight'], 'Conteúdo'),
   ],
   library: [
     hint(['Enter'], 'Selecionar'),

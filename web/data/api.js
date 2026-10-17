@@ -21,3 +21,7 @@ export const fetchMonthlySeries = ()  => apiFetch('/stats/monthly-series');
 export const fetchDailySeries   = ()  => apiFetch('/stats/daily-series');
 export const fetchLongestSessions = (limit) => apiFetch(`/stats/longest-sessions?limit=${limit}`);
 export const fetchSystemLive     = ()  => apiFetch('/system/live');
+export const fetchSystemHistory  = (hours) => apiFetch(`/system/history?hours=${hours}`);
+export const fetchSystemAlerts   = ()  => apiFetch('/system/alerts');
+export const fetchSystemSessions = ()  => apiFetch('/system/sessions');
+export const fetchSessionPerf    = (id) => apiFetch(`/system/sessions/${id}`);

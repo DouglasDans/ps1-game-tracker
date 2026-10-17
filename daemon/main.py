@@ -29,6 +29,7 @@ from daemon.db import (
 )
 from daemon.enricher import enricher_loop
 from daemon.session_manager import SessionManager, normalize_game_name
+from daemon import journal
 from daemon.system import SystemProbe
 from daemon.watchers.lrtl import import_sessions, migrate_retroarch_games
 from daemon.watchers.procfs import poll as procfs_poll
@@ -260,6 +261,37 @@ _system_probe = SystemProbe()
 @app.get("/system/live")
 def system_live():
     return _system_probe.snapshot()
+
+
+# Histórico, alertas e desempenho por sessão vêm do journal (fonte única de
+# logs do Pi) — ler 7 dias custa ~20ms, então não há cache nem tabela.
+HISTORY_WINDOWS_H = (6, 24, 168)
+
+
+@app.get("/system/history")
+def system_history(hours: int = 24):
+    if hours not in HISTORY_WINDOWS_H:
+        raise HTTPException(status_code=400, detail=f"hours must be one of {HISTORY_WINDOWS_H}")
+    end = time.time()
+    return journal.history(journal.read_entries(f"-{hours}h"), start=end - hours * 3600, end=end)
+
+
+@app.get("/system/alerts")
+def system_alerts(days: int = 7):
+    return journal.alerts(journal.read_entries(f"-{days}d"))
+
+
+@app.get("/system/sessions")
+def system_sessions():
+    return journal.session_list(journal.read_entries("-30d"))
+
+
+@app.get("/system/sessions/{session_id}")
+def system_session_perf(session_id: int):
+    perf = journal.session_perf(journal.read_entries("-30d"), session_id)
+    if perf is None:
+        raise HTTPException(status_code=404, detail="no performance data for this session")
+    return perf
 
 
 @app.get("/sessions/active")

@@ -2244,3 +2244,189 @@ body {
 .sys-grid .stats-overview-side > .pg-panel:last-child {
   flex: 1;
 }
+
+/* ── Sistema: gráficos temporais (Histórico, Por sessão) ── */
+.sys-band { fill: rgba(255, 255, 255, 0.06); }
+.sys-threshold { stroke: var(--sys-warn); stroke-width: 1.5; stroke-dasharray: 6 6; opacity: 0.6; }
+.sys-throttle-mark { stroke: var(--sys-bad); stroke-width: 2; opacity: 0.7; }
+
+.evo-line-focus.sys-line-temp { stroke: #ffb38a; }
+.evo-line-focus.sys-line-cpu { stroke: #9fb4ff; }
+.evo-line-focus.sys-line-mem { stroke: #c9a8ff; }
+.evo-line-focus.sys-line-emu { stroke: var(--sys-ok); }
+
+.sys-legend {
+  display: flex;
+  gap: 24px;
+}
+
+.sys-legend span {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sys-key {
+  display: inline-block;
+  width: 18px;
+  height: 10px;
+  border-radius: 3px;
+}
+
+.sys-key-band { background: rgba(255, 255, 255, 0.18); }
+.sys-key-threshold { height: 0; border-top: 2px dashed var(--sys-warn); border-radius: 0; }
+.sys-key-throttle { width: 3px; background: var(--sys-bad); }
+.sys-key-cpu { height: 4px; background: #9fb4ff; }
+.sys-key-emu { height: 4px; background: var(--sys-ok); }
+
+/* Histórico: window chips use the top nav's pill (white = selected). */
+.sys-history {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.sys-history-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.sys-window-chips {
+  display: flex;
+  gap: 8px;
+}
+
+.sys-chip {
+  padding: 10px 24px;
+  border-radius: 999px;
+  font-size: 22px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.sys-chip.active {
+  color: #0b0d12;
+  background: #f2f3f5;
+  border-color: #f2f3f5;
+  font-weight: 700;
+}
+
+/* Por sessão: list on the left, the selected session's charts on the right. */
+.sys-sessions {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 520px 1fr;
+  gap: 16px;
+}
+
+.sys-session-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.sys-session-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sys-session-row {
+  padding: 14px 18px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.sys-session-row.active {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.22);
+  color: var(--text);
+}
+
+.sys-session-list.focused .sys-session-row.active {
+  box-shadow: inset 0 0 0 2px var(--select);
+}
+
+.sys-session-game {
+  font-size: 22px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sys-session-meta {
+  font-family: var(--font-text);
+  font-weight: 600;
+  font-size: 16px;
+  color: rgba(255, 255, 255, 0.45);
+  margin-top: 4px;
+}
+
+.sys-session-detail {
+  min-width: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+
+
+/* Alertas */
+.sys-alert-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.sys-alert-row {
+  display: grid;
+  grid-template-columns: 12px 190px 1fr;
+  align-items: baseline;
+  gap: 18px;
+  padding: 16px 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.sys-alert-row:first-child {
+  border-top: none;
+}
+
+.sys-alert-time {
+  font-family: var(--font-text);
+  font-weight: 600;
+  font-size: 18px;
+  color: rgba(255, 255, 255, 0.5);
+  font-variant-numeric: tabular-nums;
+}
+
+.sys-alert-body {
+  min-width: 0;
+}
+
+.sys-alert-title {
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.sys-alert-game {
+  font-weight: 400;
+  color: var(--text-dim);
+}
+
+.sys-alert-msg {
+  margin-top: 4px;
+  font-family: var(--font-text);
+  font-size: 16px;
+  color: rgba(255, 255, 255, 0.45);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
