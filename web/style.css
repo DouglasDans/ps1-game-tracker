@@ -2447,3 +2447,210 @@ body {
   background: var(--sys-warn);
   box-shadow: 0 0 10px rgba(255, 197, 107, 0.6);
 }
+
+/* ── Stats › Biblioteca (coleção) ── */
+.lib-card-sub {
+  font-family: var(--font-text);
+  font-weight: 600;
+  font-size: 17px;
+  color: rgba(255, 255, 255, 0.42);
+}
+
+/* Same-row panels stretch together, like the Sistema grid. */
+.lib-grid > * > .pg-panel {
+  height: 100%;
+}
+
+.lib-plat-row {
+  display: grid;
+  grid-template-columns: 100px 1fr 90px 96px;
+  align-items: center;
+  gap: 16px;
+}
+
+.lib-plat-count {
+  text-align: right;
+  font-family: var(--font-text);
+  font-weight: 600;
+  font-size: 18px;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.lib-tiers {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.lib-tier-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.lib-tier-label {
+  font-size: 21px;
+  font-weight: 700;
+}
+
+.lib-tier-count {
+  font-size: 30px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.lib-tier-sub {
+  font-family: var(--font-text);
+  font-weight: 600;
+  font-size: 15px;
+  color: rgba(255, 255, 255, 0.42);
+}
+
+.lib-cover-strip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.lib-mini-cover {
+  position: relative; /* .cover-img is absolute, inset 0 */
+  flex-shrink: 0;
+  width: 42px;
+  height: 56px;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.lib-more {
+  font-family: var(--font-text);
+  font-weight: 600;
+  font-size: 16px;
+  color: rgba(255, 255, 255, 0.5);
+  padding: 0 4px;
+}
+
+.lib-genre-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.lib-genre-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 14px;
+  align-items: baseline;
+}
+
+.lib-genre-label {
+  font-size: 19px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lib-genre-count,
+.lib-genre-time {
+  font-family: var(--font-text);
+  font-weight: 600;
+  font-size: 16px;
+  color: rgba(255, 255, 255, 0.5);
+  font-variant-numeric: tabular-nums;
+}
+
+.lib-genre-time {
+  width: 72px;
+  text-align: right;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.lib-forgot-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.lib-forgot-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.lib-forgot-info {
+  min-width: 0;
+}
+
+.lib-forgot-name {
+  font-size: 19px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lib-forgot-meta {
+  font-family: var(--font-text);
+  font-weight: 600;
+  font-size: 15px;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+/* Release timeline: covers stacked over their year on a horizontal axis. */
+.lib-timeline {
+  position: relative;
+  padding: 0 30px;
+}
+
+.lib-tl-stacks {
+  position: relative;
+  height: 150px; /* 3 covers + the "+N" label: the tab must fit one screen */
+}
+
+.lib-tl-stack {
+  position: absolute;
+  bottom: 0;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.lib-tl-cover {
+  opacity: 0.45;
+}
+
+/* Years sit ~30px apart on the axis: timeline covers are smaller than the
+   strips' so neighbouring years don't overlap. */
+.lib-tl-mini {
+  width: 28px;
+  height: 38px;
+  border-radius: 3px;
+}
+
+.lib-tl-cover.fav {
+  opacity: 1;
+}
+
+.lib-tl-cover.fav .lib-mini-cover {
+  box-shadow: 0 0 0 2px var(--select);
+}
+
+.lib-tl-axis {
+  position: relative;
+  height: 34px;
+  margin-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.lib-tl-tick {
+  position: absolute;
+  top: 8px;
+  transform: translateX(-50%);
+  font-family: var(--font-text);
+  font-weight: 600;
+  font-size: 15px;
+  color: rgba(255, 255, 255, 0.45);
+}

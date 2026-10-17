@@ -1,4 +1,4 @@
-import { fetchGames, fetchStats, fetchActivity, fetchLongestSessions, fetchMonthly, fetchMonthlySeries, fetchDailySeries } from '../data/api.js';
+import { fetchGames, fetchStats, fetchActivity, fetchLongestSessions, fetchMonthly, fetchMonthlySeries, fetchDailySeries, fetchCollection } from '../data/api.js';
 import { lineAxes, lineFocus, linePath, lineScales } from '../charts.js';
 import { fmtTime, fmtDateShort, cardGradient, platformLogoImg, extractDominantColor, hueOf, hueOfName } from '../utils.js';
 
@@ -28,8 +28,10 @@ export function mount(container, navigate, params = {}) {
 
   // The daily series is optional: a backend not yet restarted with the
   // endpoint drops the month chart instead of the whole screen.
-  Promise.all([fetchGames(), fetchStats(), fetchActivity(), fetchLongestSessions(LONGEST_SESSIONS_MAX), fetchMonthly(), fetchMonthlySeries(), fetchDailySeries().catch(() => null)])
-    .then(([games, stats, activity, longestSessions, monthly, series, daily]) => {
+  // The collection (games on disk) is optional too: without it Biblioteca
+  // still shows what the tracker knows from sessions alone.
+  Promise.all([fetchGames(), fetchStats(), fetchActivity(), fetchLongestSessions(LONGEST_SESSIONS_MAX), fetchMonthly(), fetchMonthlySeries(), fetchDailySeries().catch(() => null), fetchCollection().catch(() => null)])
+    .then(([games, stats, activity, longestSessions, monthly, series, daily, collection]) => {
       if (cancelled) return;
       const charts = [monthChart(daily), historyChart(series)].filter(Boolean);
 
@@ -38,7 +40,7 @@ export function mount(container, navigate, params = {}) {
         activity: buildActivity(activity, longestSessions),
         monthly: buildMonthly(monthly),
         evolution: buildEvolution(charts),
-        library: buildLibraryTab(stats, games),
+        library: buildLibraryTab(games, collection),
       };
 
       const rail = TABS.map((t, i) =>
@@ -164,11 +166,6 @@ function splitField(value) {
   if (!value) return null;
   const tokens = value.split(',').map(s => s.trim()).filter(Boolean);
   return tokens.length ? tokens : null;
-}
-
-function decadeOf(year) {
-  if (!year) return null;
-  return `${Math.floor(year / 10) * 10}s`;
 }
 
 const DAY_PERIODS = [
@@ -393,32 +390,142 @@ function buildActivity(activity, longestSessions) {
     </div>`;
 }
 
-function buildLibraryTab(s, games) {
-  const decadeBars = aggregateBy(games, g => { const d = decadeOf(g.release_year); return d ? [d] : null; }, 'Desconhecida')
-    .map(d => barRow(d.label, d.total_seconds, d.pct))
-    .join('');
+// ── Biblioteca: a coleção, não só o tempo ─────────────────────────────────
+// "Onde gastei tempo" já está na Visão geral; aqui é a coleção em si: o que
+// há no disco (GET /stats/collection), o quanto foi jogado, o engajamento
+// com cada jogo, os favoritos esquecidos e a biblioteca no tempo.
 
-  const developerBars = aggregateBy(games, g => splitField(g.developer), 'Desconhecida')
-    .slice(0, 6)
-    .map(d => barRow(d.label, d.total_seconds, d.pct))
-    .join('');
+const FAVORITE_S = 5 * 3600;
+const FORGOTTEN_MIN_S = 3600;
+const FORGOTTEN_DAYS = 30;
+const DAY_MS = 86400000;
 
-  const gameModeBars = aggregateBy(games, g => splitField(g.game_modes), 'Desconhecido')
-    .map(m => barRow(m.label, m.total_seconds, m.pct))
-    .join('');
+const daysSince = utc => Math.floor((Date.now() - Date.parse(utc.replace(' ', 'T') + 'Z')) / DAY_MS);
+const pct = (part, total) => (total ? Math.round((part / total) * 100) : 0);
 
-  return `
-    <div class="stats-columns">
-      <div class="stats-col">
-        ${panel('Por plataforma', `<div class="platform-bars">${platformBars(s)}</div>`)}
-        ${panel('Por gênero', `<div class="platform-bars">${genreBars(games, 6)}</div>`)}
-      </div>
-      <div class="stats-col">
-        ${panel('Por desenvolvedora', `<div class="platform-bars">${developerBars}</div>`)}
-        ${panel('Por década', `<div class="platform-bars">${decadeBars}</div>`)}
-        ${panel('Por modo de jogo', `<div class="platform-bars">${gameModeBars}</div>`)}
-      </div>
-    </div>`;
+function libraryCards(games, collection) {
+  const years = games.map(g => g.release_year).filter(Boolean);
+  const avgYear = years.length ? Math.round(years.reduce((a, b) => a + b, 0) / years.length) : null;
+  const yearSub = years.length ? `de ${Math.min(...years)} a ${Math.max(...years)}` : '';
+  const c = collection;
+  const card = (icon, label, value, sub) => `<div class="stats-card">
+    <div class="stats-card-label"><span class="msr">${icon}</span>${label}</div>
+    <div class="stats-card-value">${value}</div>
+    ${sub ? `<div class="lib-card-sub">${sub}</div>` : ''}
+  </div>`;
+  return `<div class="stats-summary-cards">
+    ${c ? card('storage', 'No disco', c.on_disk, `${c.by_platform.length} plataformas`) : card('videogame_asset', 'Jogos', games.length)}
+    ${c ? card('sports_esports', 'Jogados', c.played, `${pct(c.played, c.on_disk)}% da coleção`) : ''}
+    ${c ? card('new_releases', 'Não jogados', c.not_played, c.opened_only ? `${c.opened_only} só abertos por menos de 2 min` : 'nunca abertos') : ''}
+    ${card('calendar_month', 'Lançamento médio', avgYear ?? '—', yearSub)}
+  </div>`;
+}
+
+function collectionPanel(collection) {
+  if (!collection) return panel('Por plataforma', '<div class="heatmap-empty">Coleção do disco indisponível.</div>');
+  const rows = collection.by_platform.map(p => `
+    <div class="lib-plat-row">
+      <div class="platform-bar-logo">${platformLogoImg(p.platform)}</div>
+      <div class="platform-bar-track"><div class="platform-bar-fill" style="width:${Math.max(1, pct(p.played, p.on_disk))}%"></div></div>
+      <div class="lib-plat-count">${p.played} de ${p.on_disk}</div>
+      <div class="platform-bar-value">${p.total_seconds ? fmtTime(p.total_seconds) : '—'}</div>
+    </div>`).join('');
+  return panel('Por plataforma', `<div class="platform-bars">${rows}</div>`, 'Jogados de quantos há no disco');
+}
+
+function coverStrip(list, max) {
+  const shown = list.slice(0, max).map(g => coverBox(g, 'lib-mini-cover')).join('');
+  const more = list.length > max ? `<span class="lib-more">+${list.length - max}</span>` : '';
+  return `<div class="lib-cover-strip">${shown}${more}</div>`;
+}
+
+function engagementPanel(games, collection) {
+  const byTime = [...games].sort((a, b) => b.total_seconds - a.total_seconds);
+  const tiers = [
+    { label: 'Favoritos', sub: '5h ou mais', list: byTime.filter(g => g.total_seconds >= FAVORITE_S) },
+    { label: 'Jogou algumas vezes', sub: '2 sessões ou mais', list: byTime.filter(g => g.total_seconds < FAVORITE_S && g.session_count > 1) },
+    { label: 'Uma sessão só', sub: 'jogou uma vez', list: byTime.filter(g => g.total_seconds < FAVORITE_S && g.session_count === 1) },
+  ];
+  const rows = tiers.map(t => `<div class="lib-tier">
+    <div class="lib-tier-head"><span class="lib-tier-label">${t.label}</span><span class="lib-tier-count">${t.list.length}</span></div>
+    <div class="lib-tier-sub">${t.sub}</div>
+    ${t.list.length ? coverStrip(t.list, 6) : ''}
+  </div>`).join('');
+  const opened = collection?.opened_only
+    ? `<div class="lib-tier"><div class="lib-tier-head"><span class="lib-tier-label">Só abriu</span><span class="lib-tier-count">${collection.opened_only}</span></div><div class="lib-tier-sub">menos de 2 min</div></div>`
+    : '';
+  return panel('Engajamento', `<div class="lib-tiers">${rows}${opened}</div>`);
+}
+
+function genreCountRows(games, limit) {
+  const counts = new Map();
+  for (const g of games) for (const t of splitField(g.genre) ?? ['Sem gênero']) counts.set(t, (counts.get(t) ?? 0) + 1);
+  return aggregateBy(games, g => splitField(g.genre), 'Sem gênero').slice(0, limit).map(g => `
+    <div class="lib-genre-row">
+      <span class="lib-genre-label">${g.label}</span>
+      <span class="lib-genre-count">${counts.get(g.label)} ${counts.get(g.label) === 1 ? 'jogo' : 'jogos'}</span>
+      <span class="lib-genre-time">${fmtTime(g.total_seconds)}</span>
+    </div>`).join('');
+}
+
+function forgottenPanel(games) {
+  const list = games
+    .filter(g => g.total_seconds >= FORGOTTEN_MIN_S && g.last_played && daysSince(g.last_played) >= FORGOTTEN_DAYS)
+    .sort((a, b) => b.total_seconds - a.total_seconds)
+    .slice(0, 4);
+  const body = list.length
+    ? list.map(g => `<div class="lib-forgot-row">
+        ${coverBox(g, 'lib-mini-cover')}
+        <div class="lib-forgot-info">
+          <div class="lib-forgot-name">${g.display_name}</div>
+          <div class="lib-forgot-meta">${fmtTime(g.total_seconds)} · há ${daysSince(g.last_played)} dias</div>
+        </div>
+      </div>`).join('')
+    : '<div class="heatmap-empty">Você jogou todos os seus jogos de 1h+ no último mês.</div>';
+  return panel('Faz tempo que não joga', `<div class="lib-forgot-list">${body}</div>`);
+}
+
+// Covers stacked over their release year; favorites (5h+) at full opacity,
+// the rest dimmed — the axis shows where the library sits in time.
+const TIMELINE_STACK = 3;
+
+function releaseTimeline(games) {
+  const dated = games.filter(g => g.release_year);
+  if (!dated.length) return panel('Linha do tempo de lançamento', '<div class="heatmap-empty">Sem anos de lançamento.</div>');
+  const first = Math.min(...dated.map(g => g.release_year));
+  const last = Math.max(...dated.map(g => g.release_year));
+  const span = Math.max(1, last - first);
+  const byYear = new Map();
+  for (const g of [...dated].sort((a, b) => b.total_seconds - a.total_seconds)) {
+    if (!byYear.has(g.release_year)) byYear.set(g.release_year, []);
+    byYear.get(g.release_year).push(g);
+  }
+  const left = y => `${((y - first) / span) * 100}%`;
+  const stacks = [...byYear.entries()].map(([year, list]) => `
+    <div class="lib-tl-stack" style="left:${left(year)}">
+      ${list.length > TIMELINE_STACK ? `<span class="lib-more">+${list.length - TIMELINE_STACK}</span>` : ''}
+      ${list.slice(0, TIMELINE_STACK).reverse().map(g =>
+        `<div class="lib-tl-cover${g.total_seconds >= FAVORITE_S ? ' fav' : ''}">${coverBox(g, 'lib-mini-cover lib-tl-mini')}</div>`).join('')}
+    </div>`).join('');
+  const ticks = [];
+  for (let y = Math.ceil(first / 5) * 5; y <= last; y += 5) ticks.push(y);
+  if (ticks[0] !== first) ticks.unshift(first);
+  if (ticks.at(-1) !== last) ticks.push(last);
+  const axis = ticks.map(y => `<span class="lib-tl-tick" style="left:${left(y)}">${y}</span>`).join('');
+  return panel('Linha do tempo de lançamento',
+    `<div class="lib-timeline"><div class="lib-tl-stacks">${stacks}</div><div class="lib-tl-axis">${axis}</div></div>`,
+    'Destacados: 5h ou mais');
+}
+
+function buildLibraryTab(games, collection) {
+  return `<div class="stats-overview-grid lib-grid">
+    <div class="span-4">${libraryCards(games, collection)}</div>
+    <div class="span-2">${collectionPanel(collection)}</div>
+    <div>${engagementPanel(games, collection)}</div>
+    <div>${panel('Por gênero', `<div class="lib-genre-list">${genreCountRows(games, 8)}</div>`)}</div>
+    <div class="span-3">${releaseTimeline(games)}</div>
+    <div>${forgottenPanel(games)}</div>
+  </div>`;
 }
 
 const MONTH_NAMES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];

@@ -166,6 +166,25 @@ def heartbeat(conn: sqlite3.Connection, session_id: int) -> None:
     conn.commit()
 
 
+def get_played_canonical(conn: sqlite3.Connection) -> list[dict]:
+    """Jogos jogados por canonical_name (a view usa o canonical como
+    display_name) — a chave para cruzar com os arquivos do disco."""
+    rows = conn.execute(
+        "SELECT display_name AS canonical_name, platform, total_seconds FROM playtime_summary"
+    ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def get_opened_canonical(conn: sqlite3.Connection) -> list[dict]:
+    """Todo jogo com alguma sessão, inclusive as curtas (< MIN_SESSION_S)
+    que ficam fora da playtime_summary — "abriu, mas não jogou"."""
+    rows = conn.execute(
+        "SELECT DISTINCT COALESCE(g.canonical_name, g.file_path) AS canonical_name, g.platform "
+        "FROM games g JOIN sessions s ON s.game_id = g.id"
+    ).fetchall()
+    return [dict(r) for r in rows]
+
+
 def get_open_sessions(conn: sqlite3.Connection) -> list[dict]:
     """Sessões sem ended_at, mais recente primeiro (com o file_path do jogo)."""
     rows = conn.execute(
