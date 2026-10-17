@@ -69,6 +69,7 @@ ExecStart=$VENV_DIR/bin/uvicorn daemon.main:app --host 0.0.0.0 --port $port
 WorkingDirectory=$SCRIPT_DIR
 Restart=always
 RestartSec=5
+SyslogIdentifier=ps1-tracker
 User=$CURRENT_USER
 
 [Install]

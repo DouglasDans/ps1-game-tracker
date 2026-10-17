@@ -35,7 +35,7 @@ from daemon.watchers.samba import poll as samba_poll
 
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+    format="%(levelname)s %(name)s: %(message)s",  # o journal já carimba a hora
 )
 logger = logging.getLogger(__name__)
 

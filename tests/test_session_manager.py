@@ -346,3 +346,40 @@ def test_resume_heartbeat_still_works(conn):
 
     row = conn.execute("SELECT heartbeat_at FROM sessions WHERE ended_at IS NULL").fetchone()
     assert row is not None
+
+
+def _events(caplog):
+    return [r.getMessage() for r in caplog.records if r.name == "daemon.session_manager"]
+
+
+def test_session_start_logs_structured_event(conn, caplog):
+    caplog.set_level("INFO")
+    manager = SessionManager(conn)
+    manager.on_game_start("/mnt/usb-flash/Retrogaming/PS1/Metal Gear Solid (USA).cue", "duckstation")
+
+    sid = manager._active_session_id
+    assert _events(caplog) == [
+        f'session_start session={sid} game="Metal Gear Solid" platform=PS1 source=duckstation '
+        f'file="/mnt/usb-flash/Retrogaming/PS1/Metal Gear Solid (USA).cue"'
+    ]
+
+
+def test_session_end_logs_structured_event(conn, caplog):
+    manager = SessionManager(conn)
+    manager.on_game_start("/roms/mgs.cue", "duckstation")
+    sid = manager._active_session_id
+    caplog.set_level("INFO")
+    manager.on_game_stop()
+
+    assert _events(caplog) == [f"session_end session={sid} game=mgs platform=PS1 source=duckstation"]
+
+
+def test_session_resume_logs_structured_event(conn, caplog):
+    manager = SessionManager(conn, now_fn=lambda: 100.0)
+    manager.on_game_start("/roms/mgs.cue", "duckstation")
+    sid = manager._active_session_id
+    manager.on_game_stop()
+    caplog.set_level("INFO")
+    manager.on_game_start("/roms/mgs.cue", "duckstation")
+
+    assert _events(caplog) == [f"session_resume session={sid} game=mgs platform=PS1 source=duckstation file=/roms/mgs.cue"]

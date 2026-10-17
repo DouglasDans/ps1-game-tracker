@@ -31,6 +31,19 @@ def strip_ps2_serial(stem: str) -> str:
 
 logger = logging.getLogger(__name__)
 
+
+def _kv(value: object) -> str:
+    text = str(value)
+    if not text or any(c in text for c in ' "=\t'):
+        return '"' + text.replace('"', '\\"') + '"'
+    return text
+
+
+def _log_event(event: str, **fields: object) -> None:
+    # Mesmo formato chave=valor do sys-monitor e do ps-covers: o journal vira
+    # a linha do tempo das sessões (journalctl -t ps1-tracker | grep session_).
+    logger.info(" ".join([event] + [f"{k}={_kv(v)}" for k, v in fields.items()]))
+
 _PATH_PLATFORMS: dict[str, str] = {
     "PS1":   "PS1",
     "PSX":   "PS1",
@@ -65,6 +78,7 @@ class SessionManager:
     _active_file_path: str | None = field(default=None, init=False)
     _active_canonical_name: str | None = field(default=None, init=False)
     _active_source: str | None = field(default=None, init=False)
+    _active_platform: str | None = field(default=None, init=False)
     _last_closed_session_id: int | None = field(default=None, init=False)
     _last_closed_canonical_name: str | None = field(default=None, init=False)
     _last_closed_source: str | None = field(default=None, init=False)
@@ -86,8 +100,10 @@ class SessionManager:
             self._active_file_path = file_path
             self._active_canonical_name = canonical_name
             self._active_source = source
+            self._active_platform = platform
             self._last_closed_session_id = None
-            logger.info("Session resumed: %s (%s)", file_path, source)
+            _log_event("session_resume", session=self._active_session_id, game=canonical_name,
+                       platform=platform, source=source, file=file_path)
             return
 
         game_id = upsert_game(self.conn, file_path, display_name, platform, canonical_name)
@@ -95,7 +111,9 @@ class SessionManager:
         self._active_file_path = file_path
         self._active_canonical_name = canonical_name
         self._active_source = source
-        logger.info("Session opened: %s (%s)", file_path, source)
+        self._active_platform = platform
+        _log_event("session_start", session=self._active_session_id, game=canonical_name,
+                   platform=platform, source=source, file=file_path)
 
     def on_game_stop(self) -> None:
         if self._active_session_id is None:
@@ -116,7 +134,8 @@ class SessionManager:
 
     def _close_current(self) -> None:
         close_session(self.conn, self._active_session_id)
-        logger.info("Session closed: %s", self._active_file_path)
+        _log_event("session_end", session=self._active_session_id, game=self._active_canonical_name,
+                   platform=self._active_platform, source=self._active_source)
         self._last_closed_session_id = self._active_session_id
         self._last_closed_canonical_name = self._active_canonical_name
         self._last_closed_source = self._active_source
@@ -125,3 +144,4 @@ class SessionManager:
         self._active_file_path = None
         self._active_canonical_name = None
         self._active_source = None
+        self._active_platform = None
