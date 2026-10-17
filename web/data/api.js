@@ -20,3 +20,4 @@ export const fetchMonthly       = ()  => apiFetch('/stats/monthly');
 export const fetchMonthlySeries = ()  => apiFetch('/stats/monthly-series');
 export const fetchDailySeries   = ()  => apiFetch('/stats/daily-series');
 export const fetchLongestSessions = (limit) => apiFetch(`/stats/longest-sessions?limit=${limit}`);
+export const fetchSystemLive     = ()  => apiFetch('/system/live');

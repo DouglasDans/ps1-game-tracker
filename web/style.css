@@ -10,12 +10,14 @@
    by design, same reason SQLite (not a remote API) is the source of truth.
    Material Symbols is a static FILL=1 instance subset to the icon names
    used in the UI (Google Fonts css2 `icon_names=`) — a new icon renders
-   as its ligature text until the woff2 is re-downloaded with it added. */
+   as its ligature text until the woff2 is re-downloaded with it added.
+   Bump the ?v= below on every re-download: the TV's Chromium kept the old
+   subset cached (from before the no-store header) and showed icon names. */
 @font-face {
   font-family: "Material Symbols Rounded";
   font-style: normal;
   font-weight: 400;
-  src: url("/assets/fonts/material-symbols-rounded-subset.woff2") format("woff2");
+  src: url("/assets/fonts/material-symbols-rounded-subset.woff2?v=2") format("woff2");
 }
 
 @font-face {
@@ -2106,4 +2108,139 @@ body {
   font-family: var(--font-text);
   font-weight: 600;
   font-size: 15px;
+}
+
+/* ── Screen: Sistema ──
+   Reuses the Stats primitives (rail, .pg-panel, .stats-card, bar rows).
+   Status colors exist only here: green is the same "ok" as the controller
+   chip in the status bar; amber/red mark things that need attention. */
+:root {
+  --sys-ok: #8fe3a8;
+  --sys-warn: #ffc56b;
+  --sys-bad: #ff7a6b;
+}
+
+.sys-summary-cards .stats-card-value.sys-ok { color: var(--sys-ok); }
+.sys-summary-cards .stats-card-value.sys-warn { color: var(--sys-warn); }
+.sys-summary-cards .stats-card-value.sys-bad { color: var(--sys-bad); }
+
+.sys-card-sub {
+  font-family: var(--font-text);
+  font-weight: 600;
+  font-size: 17px;
+  color: rgba(255, 255, 255, 0.42);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.platform-bar-fill.sys-fill-warn { background: var(--sys-warn); }
+.platform-bar-fill.sys-fill-bad { background: var(--sys-bad); }
+
+/* Bar values here are "23,7 / 61,5 GB", wider than the stats' durations. */
+.sys-bar-value {
+  width: 190px;
+}
+
+.sys-disk-bars .stat-label-wide {
+  width: 170px;
+}
+
+.sys-proc-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.sys-proc-row {
+  display: grid;
+  grid-template-columns: 240px 1fr 80px 100px;
+  align-items: center;
+  gap: 16px;
+}
+
+.sys-proc-name {
+  font-size: 20px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sys-proc-value {
+  text-align: right;
+  font-family: var(--font-text);
+  font-weight: 600;
+  font-size: 18px;
+  color: rgba(255, 255, 255, 0.6);
+  font-variant-numeric: tabular-nums;
+}
+
+.sys-status-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.sys-status-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px 32px;
+}
+
+.sys-status-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+
+.sys-dot {
+  flex-shrink: 0;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+}
+
+.sys-dot-ok { background: var(--sys-ok); box-shadow: 0 0 10px rgba(143, 227, 168, 0.5); }
+.sys-dot-warn { background: var(--sys-warn); }
+.sys-dot-bad { background: var(--sys-bad); box-shadow: 0 0 10px rgba(255, 122, 107, 0.5); }
+.sys-dot-off { background: rgba(255, 255, 255, 0.2); }
+
+.sys-status-label {
+  font-size: 20px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sys-status-detail {
+  margin-left: auto;
+  flex-shrink: 0;
+  font-family: var(--font-text);
+  font-weight: 600;
+  font-size: 18px;
+  color: rgba(255, 255, 255, 0.6);
+  font-variant-numeric: tabular-nums;
+}
+
+.sys-proc-count {
+  font-family: var(--font-text);
+  font-weight: 600;
+  font-size: 17px;
+  color: rgba(255, 255, 255, 0.42);
+}
+
+/* Cards on the same row stretch to the row's height, so a shorter panel
+   (Armazenamento next to Processador) doesn't leave a gap below it. In the
+   Rede/Controles column, Controles takes whatever height is left. */
+.sys-grid > * > .pg-panel {
+  height: 100%;
+}
+
+.sys-grid .stats-overview-side > .pg-panel {
+  height: auto;
+}
+
+.sys-grid .stats-overview-side > .pg-panel:last-child {
+  flex: 1;
 }

@@ -82,6 +82,7 @@ ps1-game-tracker/
 │   │   └── lrtl.py          # RetroArch .lrtl import [FASE 2]
 │   ├── enricher.py          # ScreenScraper → IGDB → regex [FASE 3]
 │   ├── activity.py          # padrão dia/hora + streak (timezone-aware) [FASE 4]
+│   ├── system.py            # aba Sistema: leitura ao vivo de /proc, /sys, vcgencmd [FASE 8]
 │   ├── session_manager.py   # open/close/heartbeat de sessão [FASE 1]
 │   ├── db.py                # schema SQLite + funções de acesso [FASE 1]
 │   └── main.py              # FastAPI app + threads [FASE 1]
@@ -95,7 +96,8 @@ ps1-game-tracker/
 │   ├── screens/
 │   │   ├── home.js          # carrossel de recentes + hero + seção de stats globais
 │   │   ├── detail.js        # detalhe do jogo: stats estendidas + histórico de sessões
-│   │   └── library.js       # grid completo com filtros por plataforma (L1/R1)
+│   │   ├── library.js       # grid completo com filtros por plataforma (L1/R1)
+│   │   └── system.js        # aba Sistema: status do console ao vivo (polling 2s)
 │   ├── data/
 │   │   └── api.js           # fetch da API (same-origin em prod; Pi em dev local)
 │   └── assets/              # logos de plataforma (ps1/ps2/psp/dc/sega)
@@ -298,7 +300,7 @@ curl -s http://192.168.1.150:9876/sessions/active | python3 -m json.tool
 | 5 — Notion Sync         | ⬜     | Push sessão + cron diário                                                                       |
 | 6 — RetroAchievements   | ❌     | Fora do roadmap (2026-09-27) — aba Conquistas removida do Detail; coluna `ra_game_id` mantida   |
 | 7 — Produção            | ⬜     | OSD Launcher integration + config completo                                                      |
-| 8 — Console info        | ⬜     | Novo pilar: armazenamento, RAM, uso de CPU/GPU, configs do sistema (escopo a detalhar)          |
+| 8 — Console info        | 🟡     | Aba Sistema: "Agora" ✅ (2026-10-17); próximos: Alertas, Histórico, perf por sessão, ajustes     |
 
 ### MVP validado no Pi (2026-05-23)
 
@@ -350,3 +352,6 @@ Confirmado em produção com DuckStation AppImage + PPSSPP:
 **Detail — Tempo por mês em linha (2026-10-03):** na aba Estatísticas do jogo, as barras do ano corrente (jan–dez) viraram o mesmo gráfico de linha da Evolução, uma linha só na cor do jogo (`--accent-game`), com valor por mês. Janela móvel dos **últimos 12 meses** terminando no mês atual — não esbarra em meses futuros vazios nem zera em janeiro. As peças de gráfico (escalas, grade/eixos, linha destacada) saíram de `stats.js` para `web/charts.js`, compartilhado pelas duas telas; tudo continua calculado no client a partir de `d.sessions`, sem endpoint novo.
 
 **Fase 3 concluída (2026-05-30):** `daemon/enricher.py` — IGDB como único enricher (ScreenScraper descartado). `enrich_game` busca por `canonical_name` + filtro de platform (PS1=7, PS2=8, PSP=38); plataformas não mapeadas buscam sem filtro. Thread de background com fila (`enricher_loop`): seeded no startup com todos os jogos `enriched_at IS NULL`, e enfileira novos jogos detectados pelo polling loop. Throttle de 0.3s entre requests para respeitar 4 req/s do IGDB. `RateLimitError` (429): não incrementa `enrichment_retries` — game re-enfileirado após sleep de 10s. Desiste após 3 boots com falha (`enrichment_retries >= 3`). Token Twitch cacheado em `igdb_token.json` ao lado do DB (~62 dias). Schema: campo `enrichment_retries INTEGER DEFAULT 0` adicionado via `ALTER TABLE`. Configurar no Pi: adicionar `[igdb]` com `client_id` e `client_secret` ao `config.toml`.
+
+**Fase 8 — aba Sistema, "Agora" (2026-10-17):** o item "Ajustes" do topo (placeholder sem tela) virou **Sistema** (`screens/system.js`), terceira página do L1/R1 (`TOP_PAGES = home, stats, system`). **Só TV** — sem responsividade/celular (decisão do usuário). Reaproveita as primitivas das Estatísticas (`.side-rail`, `.pg-panel`, `.stats-card`, `.platform-bar-row`); cores de status só nesta tela (`--sys-ok` = o mesmo verde do chip "CONTROLE 1", `--sys-warn`, `--sys-bad`). `GET /system/live` (`daemon/system.py`, `SystemProbe`) devolve temperatura, frequência, throttling decodificado (bits 0-3 "agora" vs 16-19 "desde o boot", sticky), CPU total/por núcleo, carga, uptime, memória, discos (SD/Retrogaming/PS2SMB — mount ausente ou "zumbi" com I/O error aparece como Desmontado), eth0/wlan0, controles (`/proc/bus/input/devices`, handler `jsN`), top 8 processos **agrupados por nome** (o Chromium que exibe a própria tela roda ~6 processos; `python3` vira o nome do script) e estado dos serviços. Tudo sem root (daemon roda como douglasdans, grupo `video` pro `vcgencmd`); ~20ms por leitura. CPU/rede/processos são taxas contra a leitura anterior — **uma instância só do probe** no `main.py`, e a tela re-renderiza a cada 2s preservando o scroll. Parsers puros testáveis em `tests/test_system.py`. A fonte de ícones foi rebaixada com `monitor_heart, thermostat, speed, developer_board, storage, lan, dns, warning, history` (os dois últimos já para as próximas abas). Teste headless: com `--virtual-time-budget` o Chromium não executa o callback da View Transition — pra screenshot, zerar `document.startViewTransition` antes do `navigate()`; no aparelho a transição funciona normalmente. Histórico (gráficos) e alertas virão do **journal** (fonte única de logs do Pi: `sys-monitor`, `ingame-status`, `alert`), não de um banco novo.
+

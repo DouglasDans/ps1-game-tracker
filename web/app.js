@@ -2,16 +2,17 @@ import { mount as mountHome }    from './screens/home.js';
 import { mount as mountDetail }  from './screens/detail.js';
 import { mount as mountLibrary } from './screens/library.js';
 import { mount as mountStats }   from './screens/stats.js';
+import { mount as mountSystem }  from './screens/system.js';
 import { API_HOST }              from './data/api.js';
 
-const SCREENS = { home: mountHome, detail: mountDetail, library: mountLibrary, stats: mountStats };
+const SCREENS = { home: mountHome, detail: mountDetail, library: mountLibrary, stats: mountStats, system: mountSystem };
 
 let currentCleanup = null;
 let currentScreen = null;
 
 // Header pages cycled with L1/R1. Library and detail are sub-screens of
 // Games and keep their own shoulder-button behavior.
-const TOP_PAGES = ['home', 'stats'];
+const TOP_PAGES = ['home', 'stats', 'system'];
 
 // Wraps a screen swap in the native View Transitions API so navigation
 // gets a default crossfade for free; 'detail-open'/'detail-close' additionally
@@ -95,14 +96,12 @@ function renderHeader(screen, params) {
       <nav class="top-nav">
         <span class="nav-item${activeScreen === 'home' ? ' active' : ''}" data-screen="home"><span class="msr">sports_esports</span>Jogos</span>
         <span class="nav-item${activeScreen === 'stats' ? ' active' : ''}" data-screen="stats"><span class="msr">bar_chart</span>Estatísticas</span>
-        <span class="nav-item" data-screen="settings"><span class="msr">settings</span>Ajustes</span>
+        <span class="nav-item${activeScreen === 'system' ? ' active' : ''}" data-screen="system"><span class="msr">settings</span>Sistema</span>
       </nav>
       <span class="top-clock" id="clock"></span>`;
     document.querySelectorAll('.nav-item').forEach(el => {
       el.addEventListener('click', () => {
-        const target = el.dataset.screen;
-        if (target === 'settings') return;
-        navigate(target);
+        navigate(el.dataset.screen);
       });
     });
   }
@@ -137,8 +136,13 @@ const SCREEN_HINTS = {
   ],
   stats: [
     hint(['Escape'], 'Voltar'),
-    hint(['L1'], 'Jogos'),
+    hint(['L1', 'R1'], 'Jogos · Sistema'),
     hint(['ArrowUp', 'ArrowDown'], 'Abas'),
+    hint(['ArrowRight'], 'Rolar conteúdo'),
+  ],
+  system: [
+    hint(['Escape'], 'Voltar'),
+    hint(['L1'], 'Estatísticas'),
     hint(['ArrowRight'], 'Rolar conteúdo'),
   ],
   library: [

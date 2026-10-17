@@ -29,6 +29,7 @@ from daemon.db import (
 )
 from daemon.enricher import enricher_loop
 from daemon.session_manager import SessionManager, normalize_game_name
+from daemon.system import SystemProbe
 from daemon.watchers.lrtl import import_sessions, migrate_retroarch_games
 from daemon.watchers.procfs import poll as procfs_poll
 from daemon.watchers.samba import poll as samba_poll
@@ -249,6 +250,16 @@ def get_conn(request: Request) -> Iterator[sqlite3.Connection]:
 app = FastAPI(title="PS1 Game Tracker", lifespan=lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["GET", "POST"])
 app.middleware("http")(add_no_store_header)
+
+
+# Uma instância só: CPU, rede e processos são taxas contra a leitura anterior,
+# e a tela Sistema chama este endpoint em intervalo fixo.
+_system_probe = SystemProbe()
+
+
+@app.get("/system/live")
+def system_live():
+    return _system_probe.snapshot()
 
 
 @app.get("/sessions/active")
