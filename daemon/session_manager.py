@@ -6,7 +6,15 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from daemon.db import close_session, heartbeat, open_session, resume_session, upsert_game
+from daemon.db import (
+    close_orphan_session,
+    close_session,
+    get_open_sessions,
+    heartbeat,
+    open_session,
+    resume_session,
+    upsert_game,
+)
 
 _TRAILING_PARENS_RE = re.compile(r"\s*\([^)]*\)\s*$")
 _TRAILING_BRACKETS_RE = re.compile(r"\s*\[[^\]]*\]\s*$")
@@ -114,6 +122,29 @@ class SessionManager:
         self._active_platform = platform
         _log_event("session_start", session=self._active_session_id, game=canonical_name,
                    platform=platform, source=source, file=file_path)
+
+    def adopt_open_session(self) -> bool:
+        """No startup do daemon: assume a sessão que o processo anterior deixou
+        aberta (o crash_recovery já fechou as com heartbeat velho). Se o jogo
+        ainda roda, o primeiro poll cai no "mesmo jogo" e a sessão continua —
+        sem isso, reiniciar o daemon no meio do jogo partia a sessão em duas.
+        Se não roda mais, o polling fecha a sessão como em qualquer parada."""
+        open_sessions = get_open_sessions(self.conn)
+        if not open_sessions:
+            return False
+        newest, *extra = open_sessions
+        for orphan in extra:
+            close_orphan_session(self.conn, orphan["id"])
+
+        display_name, platform = infer_metadata(newest["file_path"], newest["source"])
+        self._active_session_id = newest["id"]
+        self._active_file_path = newest["file_path"]
+        self._active_canonical_name = display_name
+        self._active_source = newest["source"]
+        self._active_platform = platform
+        _log_event("session_resume", session=newest["id"], game=display_name, platform=platform,
+                   source=newest["source"], file=newest["file_path"], reason="daemon_restart")
+        return True
 
     def on_game_stop(self) -> None:
         if self._active_session_id is None:

@@ -123,7 +123,9 @@ def polling_loop(
     samba_debounce = config["watchers"].get("samba_debounce_polls", 3)
     retroarch_was_running = False
     consecutive_misses = 0
-    active_source: str | None = None
+    # A session adopted at startup keeps its source, so a PS2 one still gets
+    # the samba debounce on the first polls.
+    active_source: str | None = manager._active_source
     last_enqueued_path: str | None = None
 
     while not stop.is_set():
@@ -198,6 +200,7 @@ async def lifespan(app: FastAPI):
 
     resume_grace_s = config["watchers"].get("session_resume_grace_s", 35)
     manager = SessionManager(conn, resume_grace_s=resume_grace_s)
+    manager.adopt_open_session()
     stop_event = threading.Event()
     enrich_q: queue.Queue = queue.Queue()
     app.state.db_path = db_path

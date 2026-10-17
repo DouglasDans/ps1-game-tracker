@@ -166,6 +166,38 @@ def heartbeat(conn: sqlite3.Connection, session_id: int) -> None:
     conn.commit()
 
 
+def get_open_sessions(conn: sqlite3.Connection) -> list[dict]:
+    """Sessões sem ended_at, mais recente primeiro (com o file_path do jogo)."""
+    rows = conn.execute(
+        """
+        SELECT s.id, s.source, g.file_path
+        FROM sessions s
+        JOIN games g ON g.id = s.game_id
+        WHERE s.ended_at IS NULL
+        ORDER BY s.started_at DESC, s.id DESC
+        """
+    ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def close_orphan_session(conn: sqlite3.Connection, session_id: int) -> None:
+    """Fecha no último heartbeat, como o crash_recovery (não em 'agora')."""
+    conn.execute(
+        """
+        UPDATE sessions
+        SET ended_at         = COALESCE(heartbeat_at, started_at),
+            duration_s       = CAST(
+                (julianday(COALESCE(heartbeat_at, started_at)) - julianday(started_at)) * 86400
+                AS INTEGER
+            ),
+            ended_abnormally = 1
+        WHERE id = ?
+        """,
+        (session_id,),
+    )
+    conn.commit()
+
+
 def crash_recovery(conn: sqlite3.Connection) -> int:
     cursor = conn.execute(
         """

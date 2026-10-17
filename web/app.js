@@ -3,7 +3,7 @@ import { mount as mountDetail }  from './screens/detail.js';
 import { mount as mountLibrary } from './screens/library.js';
 import { mount as mountStats }   from './screens/stats.js';
 import { mount as mountSystem }  from './screens/system.js';
-import { API_HOST }              from './data/api.js';
+import { API_HOST, fetchSystemAlerts } from './data/api.js';
 
 const SCREENS = { home: mountHome, detail: mountDetail, library: mountLibrary, stats: mountStats, system: mountSystem };
 
@@ -104,6 +104,7 @@ function renderHeader(screen, params) {
         navigate(el.dataset.screen);
       });
     });
+    paintAlertBadge();
   }
   updateClock();
 }
@@ -162,6 +163,33 @@ const SCREEN_HINTS = {
 function updateHints(screen) {
   const el = document.getElementById('bottom-hints');
   if (el) el.innerHTML = (SCREEN_HINTS[screen] ?? SCREEN_HINTS.home).join('');
+}
+
+// Amber dot on "Sistema" while there is an alert from the last 24h that the
+// Alertas tab hasn't shown yet. "Seen" is a per-TV convenience in
+// localStorage — if it's lost, the dot just comes back for those alerts.
+const ALERT_SEEN_KEY = 'alertsSeenAt';
+const ALERT_WINDOW_S = 24 * 3600;
+const ALERT_POLL_MS = 60_000;
+let unseenAlerts = false;
+
+function alertsSeenAt() {
+  try { return Number(localStorage.getItem(ALERT_SEEN_KEY)) || 0; } catch { return 0; }
+}
+
+function paintAlertBadge() {
+  document.querySelector('.nav-item[data-screen="system"]')?.classList.toggle('has-alert', unseenAlerts);
+}
+
+async function refreshAlertBadge() {
+  try {
+    const alerts = await fetchSystemAlerts();
+    const since = Math.max(Date.now() / 1000 - ALERT_WINDOW_S, alertsSeenAt());
+    unseenAlerts = alerts.some(a => a.t > since);
+  } catch {
+    unseenAlerts = false;
+  }
+  paintAlertBadge();
 }
 
 function updateClock() {
@@ -268,6 +296,10 @@ function init() {
   window.addEventListener('resize', fitViewport);
 
   setInterval(updateClock, 1000);
+  refreshAlertBadge();
+  setInterval(refreshAlertBadge, ALERT_POLL_MS);
+  // The Alertas tab marks what it showed as seen (see screens/system.js).
+  document.addEventListener('alerts-seen', refreshAlertBadge);
   initGamepad();
   initPageSwitcher();
   navigate('home');

@@ -383,3 +383,53 @@ def test_session_resume_logs_structured_event(conn, caplog):
     manager.on_game_start("/roms/mgs.cue", "duckstation")
 
     assert _events(caplog) == [f"session_resume session={sid} game=mgs platform=PS1 source=duckstation file=/roms/mgs.cue"]
+
+
+def test_adopt_open_session_continues_it_instead_of_opening_new(conn):
+    # daemon anterior abriu a sessão e foi reiniciado com o jogo rodando
+    SessionManager(conn).on_game_start("/roms/mgs.cue", "duckstation")
+    sid = conn.execute("SELECT id FROM sessions").fetchone()[0]
+
+    manager = SessionManager(conn)
+    assert manager.adopt_open_session() is True
+    manager.on_game_start("/roms/mgs.cue", "duckstation")
+
+    assert conn.execute("SELECT COUNT(*) FROM sessions").fetchone()[0] == 1
+    assert manager._active_session_id == sid
+    manager.on_game_stop()
+    assert conn.execute("SELECT ended_at FROM sessions WHERE id = ?", (sid,)).fetchone()[0] is not None
+
+
+def test_adopt_open_session_then_other_game_closes_adopted(conn):
+    SessionManager(conn).on_game_start("/roms/mgs.cue", "duckstation")
+    manager = SessionManager(conn)
+    manager.adopt_open_session()
+    manager.on_game_start("/roms/ctr.cue", "duckstation")
+
+    rows = conn.execute("SELECT ended_at IS NULL FROM sessions ORDER BY id").fetchall()
+    assert [r[0] for r in rows] == [0, 1]
+
+
+def test_adopt_open_session_keeps_newest_and_closes_extra_open(conn):
+    SessionManager(conn).on_game_start("/roms/a.cue", "duckstation")
+    SessionManager(conn).on_game_start("/roms/b.cue", "duckstation")  # 2 abertas (restart antigo)
+    manager = SessionManager(conn)
+    manager.adopt_open_session()
+
+    open_ids = [r[0] for r in conn.execute("SELECT id FROM sessions WHERE ended_at IS NULL")]
+    assert open_ids == [manager._active_session_id]
+    assert manager._active_canonical_name == "b"
+
+
+def test_adopt_open_session_without_open_session(conn):
+    assert SessionManager(conn).adopt_open_session() is False
+
+
+def test_adopt_open_session_logs_resume_event(conn, caplog):
+    SessionManager(conn).on_game_start("/roms/mgs.cue", "duckstation")
+    caplog.set_level("INFO")
+    manager = SessionManager(conn)
+    manager.adopt_open_session()
+    sid = manager._active_session_id
+    assert _events(caplog) == [
+        f"session_resume session={sid} game=mgs platform=PS1 source=duckstation file=/roms/mgs.cue reason=daemon_restart"]
