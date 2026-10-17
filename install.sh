@@ -65,7 +65,7 @@ Description=PS1 Game Tracker Daemon + API
 After=network.target smbd.service
 
 [Service]
-ExecStart=$VENV_DIR/bin/uvicorn daemon.main:app --host 0.0.0.0 --port $port
+ExecStart=$VENV_DIR/bin/uvicorn daemon.main:app --host 0.0.0.0 --port $port --no-access-log
 WorkingDirectory=$SCRIPT_DIR
 Restart=always
 RestartSec=5
