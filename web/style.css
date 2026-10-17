@@ -2431,23 +2431,6 @@ body {
   text-overflow: ellipsis;
 }
 
-/* Unseen alert on the header's Sistema item (see refreshAlertBadge in app.js). */
-.nav-item.has-alert {
-  position: relative;
-}
-
-.nav-item.has-alert::after {
-  content: "";
-  position: absolute;
-  top: 8px;
-  right: 10px;
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  background: var(--sys-warn);
-  box-shadow: 0 0 10px rgba(255, 197, 107, 0.6);
-}
-
 /* ── Stats › Biblioteca (coleção) ── */
 .lib-card-sub {
   font-family: var(--font-text);

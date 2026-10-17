@@ -112,7 +112,7 @@ export function mount(container, navigate) {
     if (key === 'live') refreshLive();
     if (key === 'history') loadHistory();
     if (key === 'sessions') load(fetchSystemSessions, list => { sessions = list; sessionIndex = 0; loadSessionPerf(); });
-    if (key === 'alerts') load(fetchSystemAlerts, list => { content().innerHTML = buildAlerts(list); markAlertsSeen(list); });
+    if (key === 'alerts') load(fetchSystemAlerts, list => { content().innerHTML = buildAlerts(list); });
   }
 
   container.querySelectorAll('.rail-item').forEach((el, i) => el.addEventListener('click', () => setTab(i)));
@@ -158,13 +158,6 @@ export function mount(container, navigate) {
     clearTimeout(timer);
     document.removeEventListener('keydown', onKey);
   };
-}
-
-// Clears the amber dot on the header's Sistema item (app.js listens).
-function markAlertsSeen(list) {
-  if (!list.length) return;
-  try { localStorage.setItem('alertsSeenAt', String(list[0].t)); } catch { /* no storage: dot stays */ }
-  document.dispatchEvent(new Event('alerts-seen'));
 }
 
 // ── Formatação ────────────────────────────────────────────────────────────

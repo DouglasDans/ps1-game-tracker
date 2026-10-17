@@ -65,12 +65,47 @@ def _session_id(value: str | None) -> int | None:
     return int(value) if value and value.isdigit() else None
 
 
+# Na tela, alertas explicados pelo próprio fim/começo da sessão são ruído:
+# desligar o PS2 derruba a conexão/cabo (e o controle) segundos antes do
+# session_end, e o OPL abandona conexões ao carregar o jogo. O journal guarda
+# tudo; só a aba Alertas os esconde.
+_END_EXPLAINED = {"smb_conn_error", "ps2_link_down", "controller_lost"}
+_END_WINDOW_S = 120  # PS2 desligado: cabo cai, ~60s de keepalive até o SMB cair, +debounce
+_START_EXPLAINED = {"smb_conn_error"}
+_START_WINDOW_S = 90
+
+
+def _session_bounds(entries: list[dict]) -> tuple[dict[int, float], dict[int, float]]:
+    starts, ends = {}, {}
+    for e in entries:
+        if e["ident"] != "ps1-tracker":
+            continue
+        m = _SESSION_EVENT_RE.search(e["msg"])
+        sid = _session_id(parse_kv(e["msg"][m.start():]).get("session")) if m else None
+        if sid is None:
+            continue
+        target = ends if m.group(1) == "session_end" else starts
+        target[sid] = min(target.get(sid, e["t"]), e["t"]) if target is starts else e["t"]
+    return starts, ends
+
+
+def _explained(rule: str, sid: int | None, t: float, starts: dict, ends: dict) -> bool:
+    if sid is None:
+        return False
+    if rule in _END_EXPLAINED and sid in ends and 0 <= ends[sid] - t <= _END_WINDOW_S:
+        return True
+    return rule in _START_EXPLAINED and sid in starts and 0 <= t - starts[sid] <= _START_WINDOW_S
+
+
 def alerts(entries: list[dict]) -> list[dict]:
+    starts, ends = _session_bounds(entries)
     result = []
     for e in entries:
         if e["ident"] != "alert" or not e["msg"].startswith("ALERTA"):
             continue
         kv = parse_kv(e["msg"])
+        if _explained(kv.get("rule"), _session_id(kv.get("session")), e["t"], starts, ends):
+            continue
         result.append({
             "t": e["t"],
             "rule": kv.get("rule"),

@@ -100,3 +100,18 @@ def test_history_drops_closed_sessions_shorter_than_min_session():
         entry("ps1-tracker", 'session_end session=1 game="Teste" platform=PS1 source=duckstation', T0 + 5),
     ]
     assert history(entries, start=T0, end=T0 + 600, buckets=1)["sessions"] == []
+
+
+def test_alerts_hide_drops_explained_by_the_session_ending():
+    # desligou o PS2: a conexão/cabo cai e a sessão fecha logo depois — esperado
+    start = entry("ps1-tracker", 'session_start session=7 game="GT4" platform=PS2 source=samba file=/x.iso', T0)
+    smb_at_end = entry("alert", 'ALERTA rule=smb_conn_error session=7 game="GT4" source=samba src=smbd msg="reset"', T0 + 600, 4)
+    end = entry("ps1-tracker", 'session_end session=7 game="GT4" platform=PS2 source=samba', T0 + 610)
+    # caiu no meio do jogo: continua aparecendo
+    mid_game = entry("alert", 'ALERTA rule=smb_conn_error session=7 game="GT4" source=samba src=smbd msg="reset"', T0 + 300, 4)
+    # handover do OPL ao carregar o jogo
+    handover = entry("alert", 'ALERTA rule=smb_conn_error session=7 game="GT4" source=samba src=smbd msg="reset"', T0 + 30, 4)
+    # outro tipo de alerta perto do fim: continua aparecendo
+    temp = entry("alert", 'ALERTA rule=high_temp session=7 game="GT4" source=samba src=ingame-status msg="temp=78C"', T0 + 605, 4)
+    result = alerts([start, handover, mid_game, smb_at_end, temp, end])
+    assert [(a["rule"], a["t"]) for a in result] == [("high_temp", T0 + 605), ("smb_conn_error", T0 + 300)]
