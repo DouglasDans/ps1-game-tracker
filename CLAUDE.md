@@ -33,7 +33,7 @@ Mini console retro construído pelo usuário: um **Raspberry Pi 5** (Debian 13 T
 | -------------- | -------------------------------------------- |
 | Daemon + API   | Python 3.11+ / FastAPI / asyncio             |
 | Banco de dados | SQLite 3 (stdlib `sqlite3`)                  |
-| Enriquecimento | ScreenScraper API / IGDB API (Fase 3)        |
+| Enriquecimento | IGDB API                                     |
 | Sync           | Notion API / `notion-client` (Fase 5)        |
 | Frontend       | HTML5 / CSS3 / Vanilla JS                    |
 | Serviço        | systemd (system service, `User=douglasdans`) |
@@ -80,7 +80,7 @@ ps1-game-tracker/
 │   │   ├── procfs.py        # DuckStation + PPSSPP via /proc/PID/fd/ [FASE 1]
 │   │   ├── samba.py         # PS2 via OPL / smbstatus [FASE 2]
 │   │   └── lrtl.py          # RetroArch .lrtl import [FASE 2]
-│   ├── enricher.py          # ScreenScraper → IGDB → regex [FASE 3]
+│   ├── enricher.py          # IGDB (thread de background, throttle, retry)
 │   ├── activity.py          # padrão dia/hora + streak (timezone-aware) [FASE 4]
 │   ├── system.py            # aba Sistema: leitura ao vivo de /proc, /sys, vcgencmd [FASE 8]
 │   ├── journal.py           # aba Sistema: histórico/alertas/perf por sessão lidos do journal [FASE 8]
@@ -251,7 +251,7 @@ nano config.toml        # configurar tokens e paths
 sudo systemctl enable ps1-tracker && sudo systemctl start ps1-tracker
 ```
 
-O serviço usa `User=douglasdans` e `After=network.target`. Na Fase 2 (samba_watcher), adicionar `After=smbd.service` na unit.
+O serviço usa `User=douglasdans` e `After=network.target smbd.service` (gerado pelo `install.sh`).
 
 ---
 
@@ -335,7 +335,7 @@ Confirmado em produção com DuckStation AppImage + PPSSPP:
 
 **Backdrop dinâmico na home (2026-07-12):** o hero da home ganha gradiente com a cor dominante da cover do jogo selecionado (mesma `extractDominantColor` do detail, cache compartilhado — navegar o carrossel troca a cor instantaneamente após a primeira extração). Guarda por token contra respostas assíncronas fora de ordem ao navegar rápido. Tile Library faz fade-out do backdrop; jogo sem cover usa `cardGradient` atenuado.
 
-**Redesign TV das Stats (2026-07-12):** dia da semana virou gráfico de colunas verticais (skyline) com pico destacado por peso tipográfico (não por cor — cor segue a entidade, não o rank); novo bloco "Período do dia" com 4 cards (madrugada/manhã/tarde/noite) agregando o `by_hour` de `/stats/activity` que o front não usava. `aggregateBy` em `home.js` agora recebe keyFn que retorna array de tokens: campos IGDB compostos (`genre`, `developer`, `game_modes` — strings joined por vírgula) são divididos via `splitField` e cada token credita o tempo do jogo — antes "Racing, Simulator" e 4 variações de "Single player, Multi…" apareciam como categorias distintas. Largura das barras normalizada pelo maior item (não pelo total). Insights do detail em cards (mesmo visual das linhas de sessão).
+**Redesign TV das Stats (2026-07-12):** dia da semana virou gráfico de colunas verticais (skyline) com pico destacado por peso tipográfico (não por cor — cor segue a entidade, não o rank); novo bloco "Período do dia" com 4 cards (madrugada/manhã/tarde/noite) agregando o `by_hour` de `/stats/activity` que o front não usava. `aggregateBy` em `stats.js` agora recebe keyFn que retorna array de tokens: campos IGDB compostos (`genre`, `developer`, `game_modes` — strings joined por vírgula) são divididos via `splitField` e cada token credita o tempo do jogo — antes "Racing, Simulator" e 4 variações de "Single player, Multi…" apareciam como categorias distintas. Largura das barras normalizada pelo maior item (não pelo total). Insights do detail em cards (mesmo visual das linhas de sessão).
 
 **Metadados IGDB ampliados (2026-07-10):** `enricher.py` passa a pedir `summary`, `involved_companies.company.name`/`.developer` e `game_modes.name` do IGDB (antes só `name,genres.name,cover.image_id,first_release_date`). `involved_companies` é filtrado por `developer == True` antes de juntar os nomes — evita creditar a publisher como desenvolvedora. Campos novos (`summary`, `developer`, `game_modes`) expostos em `/games` e `/games/{id}`; detail page ganha seção "Sinopse" e developer/game_modes na linha de meta; Stats ganha barras "por desenvolvedora" e "por modo de jogo". **Jogos já enriquecidos no Pi não recebem os campos novos automaticamente** — rodar `POST /admin/reset-enrichment` uma vez após o deploy pra reprocessar a biblioteca.
 
