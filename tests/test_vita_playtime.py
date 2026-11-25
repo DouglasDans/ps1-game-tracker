@@ -176,3 +176,20 @@ def test_vt13_broken_files_do_not_stop_the_import(conn, tmp_path):
 
 def test_vt13_missing_folder_is_nothing_to_do(conn, tmp_path):
     assert import_vita_playtime(conn, tmp_path / "does-not-exist") == 0
+
+
+def test_vt15_the_folder_and_aliases_come_from_the_config(conn, tmp_path):
+    from daemon.watchers.vita import import_from_config
+    config = {"watchers": {"vita_playtime_dir": str(tmp_path)},
+              "vita_aliases": {"SCUS94455": "Gran Turismo 2"}}
+    export(tmp_path, "SCUS94455", 100, "GRAN TURISMO 2")
+    import_from_config(conn, config)
+    export(tmp_path, "SCUS94455", 700, "GRAN TURISMO 2")
+    assert import_from_config(conn, config) == 1
+    assert sessions(conn)[0]["canonical_name"] == "Gran Turismo 2"
+
+
+def test_vt15_without_a_folder_in_the_config_the_watcher_is_off(conn):
+    from daemon.watchers.vita import import_from_config
+    assert import_from_config(conn, {"watchers": {}}) == 0
+    assert import_from_config(conn, {"watchers": {"vita_playtime_dir": ""}}) == 0

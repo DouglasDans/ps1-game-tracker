@@ -151,6 +151,15 @@ def _import_entry(conn: sqlite3.Connection, entry: dict, aliases: dict[str, str]
     return 1
 
 
+def import_from_config(conn: sqlite3.Connection, config: dict) -> int:
+    """`[watchers] vita_playtime_dir` (empty = off) and the `[vita_aliases]`
+    table (title ID -> canonical name) of config.toml."""
+    folder = config.get("watchers", {}).get("vita_playtime_dir")
+    if not folder:
+        return 0
+    return import_vita_playtime(conn, folder, config.get("vita_aliases", {}))
+
+
 def import_vita_playtime(conn: sqlite3.Connection, folder: str | Path,
                          aliases: dict[str, str] | None = None) -> int:
     """Import every exported title in `folder`; returns how many sessions were created."""

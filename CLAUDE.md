@@ -79,7 +79,8 @@ ps1-game-tracker/
 │   ├── watchers/
 │   │   ├── procfs.py        # DuckStation + PPSSPP via /proc/PID/fd/ [FASE 1]
 │   │   ├── samba.py         # PS2 via OPL / smbstatus [FASE 2]
-│   │   └── lrtl.py          # RetroArch .lrtl import [FASE 2]
+│   │   ├── lrtl.py          # RetroArch .lrtl import [FASE 2]
+│   │   └── vita.py          # tempo de jogo do PS Vita (JSON do vita-sync) -> sessões
 │   ├── enricher.py          # IGDB (thread de background, throttle, retry)
 │   ├── activity.py          # padrão dia/hora + streak (timezone-aware) [FASE 4]
 │   ├── system.py            # aba Sistema: leitura ao vivo de /proc, /sys, vcgencmd [FASE 8]
@@ -170,7 +171,7 @@ ps1-game-tracker/
 │ id               INTEGER PK                             │
 │ game_id          INTEGER FK → games.id                  │
 │ source           TEXT  ← duckstation / ppsspp / samba / │
-│                              retroarch                  │
+│                              retroarch / vita           │
 │ started_at       DATETIME                               │
 │ ended_at         DATETIME                               │
 │ heartbeat_at     DATETIME                               │
@@ -322,6 +323,8 @@ Confirmado em produção com DuckStation AppImage + PPSSPP:
 **Fase 1.6 concluída (2026-05-23):** `normalize_game_name` strip iterativo de todos os grupos `(...)` finais — região, versão, track, disco. `SessionManager` compara por `canonical_name` evitando session flip quando DuckStation alterna entre fds de tracks. `playtime_summary` agrega por `canonical_name`. Descoberta relevante: DuckStation não mantém `.cue` aberto — apenas os `.bin` dos tracks ficam nos fds.
 
 **Fase 2 concluída (2026-05-23):** `samba_watcher` parseia `smbstatus -L` para detectar ISOs PS2/OPL abertas via SMB (requer entrada no sudoers). `lrtl_importer` lê `.lrtl` do RetroArch e importa sessões por delta em relação ao acumulado já no DB — disparado no startup e quando o processo RetroArch encerra. Novos campos opcionais no config: `samba_rom_dirs`, `retroarch_playlist_dirs`, `samba_debounce_polls` (default 3 — OPL solta o lock brevemente durante boot). `strip_ps2_serial` em `session_manager.py` remove o prefixo serial OPL (`SLUS_NNN.NN.`) do display_name/canonical_name. `lrtl_importer` aplica `normalize_game_name` no stem do `.lrtl` para que histórico RetroArch e procfs agregem corretamente na `playtime_summary`.
+
+**Tempo de jogo do PS Vita (2026-11-25):** `daemon/watchers/vita.py`. O serviço `ps1-vita-sync` (repo `vita-sync-pi`) exporta, depois de cada ciclo de saves, um JSON por título em `~/.local/share/vita-sync/playtime/` (`{id, seconds, title, mtime}`; `seconds` = total acumulado do BetterTrackPlug, `mtime` = UTC). O watcher guarda o último total por ID (tabela `vita_playtime_seen`): **primeira leitura = só a base, sem sessão**; total cresceu = uma sessão `source='vita'` da diferença, terminando em `mtime` (UTC naive, como `datetime('now')`); total diminuiu (plugin resetou) = nova base. Sessão e nova base saem no mesmo commit. Lido no startup e a cada `vita_import_interval_s` (60) no loop de polling — o Vita não tem evento de "jogo fechou". Config: `[watchers] vita_playtime_dir` (vazio = desligado) e `[vita_aliases]` (ID → nome canônico). Plataforma pelo prefixo do ID: `SL*/SC*` = PS1, `UL*/UC*` = PSP, o resto = **PS Vita** (inclui homebrew como GTA SA e Ship of Harkinian). `IGNORED_IDS` lista ferramentas e launchers (VitaShell, Emu4Vita++, AutoPlugin, TrackPlug, VitaXMB…) que nunca viram jogo. **Agrupamento com o que já existe:** apelido da config; senão um jogo da **mesma plataforma** cujo nome bata ignorando maiúsculas e pontuação ("God of War®: Ghost of Sparta" cai em "God of War - Ghost of Sparta"); senão o título limpo (sem ®™©) ou o próprio ID. Como a `playtime_summary` agrupa por `canonical_name` + plataforma, PS1 e PSP do Vita somam nas sessões do DuckStation/PPSSPP. Sessões < 120 s ficam no banco (a view `played_sessions` as esconde). Os jogos novos só são enriquecidos (IGDB) no próximo restart do daemon. Emu4Vita++ (GBA/SNES/Mega Drive) **não** grava tempo por ROM, então o retrô do Vita fica de fora.
 
 **Fase 4 concluída (2026-05-31, polish TV em 2026-07-09):** frontend em vanilla JS com módulos ES (`app.js` roteia `screens/home|detail|library`). Gamepad API mapeia botões para KeyboardEvents sintéticos (✕=Enter, ○=Escape, □=Square, L1/R1, d-pad). Passe de usabilidade TV (2026-07-09): scroll por setas no detail e na seção de stats, contraste `--text-muted` corrigido para ~6.2:1, escala tipográfica 10-foot, hints de rodapé contextuais por tela, polling de `/sessions/active` a cada 10s, "Mais jogados" com capas reais + % do tempo total, API/host derivados da origem da página (IP do Pi pode mudar sem quebrar).
 

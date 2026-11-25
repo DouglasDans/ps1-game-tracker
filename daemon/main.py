@@ -37,6 +37,7 @@ from daemon.system import SystemProbe
 from daemon.watchers.lrtl import import_sessions, migrate_retroarch_games
 from daemon.watchers.procfs import poll as procfs_poll
 from daemon.watchers.samba import poll as samba_poll
+from daemon.watchers.vita import import_from_config as import_vita_playtime
 
 logging.basicConfig(
     level=logging.INFO,
@@ -125,6 +126,10 @@ def polling_loop(
 
     samba_debounce = config["watchers"].get("samba_debounce_polls", 3)
     retroarch_was_running = False
+    # The Vita has no "game closed" event we can see: the vita-sync service
+    # drops fresh JSON files into vita_playtime_dir and we look every so often.
+    vita_every_s = config["watchers"].get("vita_import_interval_s", 60)
+    vita_last_check = time.monotonic()      # startup already imported once
     consecutive_misses = 0
     # A session adopted at startup keeps its source, so a PS2 one still gets
     # the samba debounce on the first polls.
@@ -172,6 +177,12 @@ def polling_loop(
                         logger.info("lrtl import on RetroArch exit: %d session(s)", n)
                 retroarch_was_running = retroarch_running
 
+            if time.monotonic() - vita_last_check >= vita_every_s:
+                vita_last_check = time.monotonic()
+                n = import_vita_playtime(conn, config)
+                if n:
+                    logger.info("Vita play time import: %d session(s)", n)
+
         except Exception:
             logger.exception("Error in polling loop")
         stop.wait(interval)
@@ -200,6 +211,10 @@ async def lifespan(app: FastAPI):
         n = import_sessions(conn, playlist_dirs)
         if n:
             logger.info("lrtl startup import: %d session(s)", n)
+
+    n = import_vita_playtime(conn, config)
+    if n:
+        logger.info("Vita play time startup import: %d session(s)", n)
 
     resume_grace_s = config["watchers"].get("session_resume_grace_s", 35)
     manager = SessionManager(conn, resume_grace_s=resume_grace_s)
