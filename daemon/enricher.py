@@ -219,6 +219,12 @@ def enrich_game(conn: sqlite3.Connection, game: dict, config: dict) -> bool:
     try:
         token = _get_igdb_token(config)
         result = _igdb_search(canonical_name, platform, token, igdb_cfg["client_id"])
+        if not result and platform in _IGDB_PLATFORM_IDS:
+            # Ports homebrew (GTA SA, Ship of Harkinian no Vita) não constam no
+            # IGDB pra plataforma onde rodam: melhor a capa do jogo original
+            # do que nenhuma. Só quando a busca filtrada não acha nada, então
+            # o filtro segue decidindo entre homônimos (GT de PS1 vs PSP).
+            result = _igdb_search(canonical_name, None, token, igdb_cfg["client_id"])
         if result:
             update_game_enrichment(conn, game_id, **result)
             logger.info("enriched '%s' → '%s' (igdb_id=%d)", canonical_name, result["display_name"], result["igdb_id"])

@@ -294,3 +294,46 @@ def test_igdb_search_without_platform_keeps_first_exact_match():
     result, body = _search_with(results, "Gran Turismo", None)
     assert "where platforms" not in body
     assert result["igdb_id"] == 2009
+
+
+def test_enrich_game_retries_without_platform_when_platform_search_finds_nothing(conn):
+    # Ports homebrew (GTA SA no Vita) não existem no IGDB pra plataforma
+    upsert_game(conn, "vita://GTASA0000", "GTA SA", "PS Vita", "Grand Theft Auto: San Andreas")
+    game = _row(conn, "vita://GTASA0000")
+    found = {"display_name": "Grand Theft Auto: San Andreas", "cover_url": "https://x/co.jpg",
+             "genre": None, "release_year": 2004, "igdb_id": 732, "summary": None,
+             "developer": None, "publisher": None, "game_modes": None}
+
+    with patch("daemon.enricher._get_igdb_token", return_value="tok"), \
+         patch("daemon.enricher._igdb_search", side_effect=[None, found]) as search:
+        result = enrich_game(conn, game, IGDB_CONFIG)
+
+    assert result is True
+    assert [c.args[1] for c in search.call_args_list] == ["PS Vita", None]
+    assert _row(conn, "vita://GTASA0000")["igdb_id"] == 732
+
+
+def test_enrich_game_does_not_drop_platform_when_platform_search_matches(conn):
+    upsert_game(conn, "/roms/PSP/gt.iso", "GT", "PSP", "Gran Turismo")
+    game = _row(conn, "/roms/PSP/gt.iso")
+    found = {"display_name": "Gran Turismo", "cover_url": None, "genre": None,
+             "release_year": 2009, "igdb_id": 20426, "summary": None,
+             "developer": None, "publisher": None, "game_modes": None}
+
+    with patch("daemon.enricher._get_igdb_token", return_value="tok"), \
+         patch("daemon.enricher._igdb_search", return_value=found) as search:
+        enrich_game(conn, game, IGDB_CONFIG)
+
+    assert search.call_count == 1
+
+
+def test_enrich_game_counts_one_retry_when_both_searches_find_nothing(conn):
+    upsert_game(conn, "vita://XXXX00000", "?", "PS Vita", "Nothing Like This")
+    game = _row(conn, "vita://XXXX00000")
+
+    with patch("daemon.enricher._get_igdb_token", return_value="tok"), \
+         patch("daemon.enricher._igdb_search", return_value=None) as search:
+        assert enrich_game(conn, game, IGDB_CONFIG) is False
+
+    assert search.call_count == 2
+    assert _row(conn, "vita://XXXX00000")["enrichment_retries"] == 1
