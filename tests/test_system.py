@@ -1,3 +1,7 @@
+from pathlib import Path
+
+import pytest
+
 from daemon.system import (
     CpuSampler,
     decode_throttled,
@@ -85,6 +89,8 @@ def test_friendly_name_shows_python_script():
     assert friendly_name("smbd", ["/usr/sbin/smbd", "--foreground"]) == "smbd"
 
 
+@pytest.mark.skipif(not Path("/sys/class/thermal/thermal_zone0/temp").exists(),
+                    reason="reads the live sensors of the Pi; this machine has no thermal_zone0")
 def test_system_live_endpoint_returns_snapshot():
     from fastapi.testclient import TestClient
 
