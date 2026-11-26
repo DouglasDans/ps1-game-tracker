@@ -26,6 +26,7 @@ from daemon.db import (
     get_monthly_stats,
     get_stats_summary,
     get_unenriched_games,
+    get_untried_games,
     init_db,
     reset_all_enrichment,
 )
@@ -182,6 +183,8 @@ def polling_loop(
                 n = import_vita_playtime(conn, config)
                 if n:
                     logger.info("Vita play time import: %d session(s)", n)
+                    for game in get_untried_games(conn, "vita://"):
+                        enrich_q.put(game)
 
         except Exception:
             logger.exception("Error in polling loop")

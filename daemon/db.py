@@ -276,6 +276,21 @@ def get_unenriched_games(conn: sqlite3.Connection) -> list[dict]:
     return [dict(r) for r in rows]
 
 
+def get_untried_games(conn: sqlite3.Connection, path_prefix: str) -> list[dict]:
+    """Games under path_prefix the enricher never looked at.
+
+    For importers that create games outside the startup queue: after one try
+    the retry count moves off 0, so polling this never queues a game twice.
+    """
+    rows = conn.execute(
+        "SELECT id, file_path, display_name, platform, canonical_name "
+        "FROM games WHERE enriched_at IS NULL AND enrichment_retries = 0 "
+        "AND file_path LIKE ? || '%'",
+        (path_prefix,),
+    ).fetchall()
+    return [dict(r) for r in rows]
+
+
 def update_game_enrichment(
     conn: sqlite3.Connection,
     game_id: int,

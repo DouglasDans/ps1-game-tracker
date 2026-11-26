@@ -17,6 +17,7 @@ from daemon.db import (
     get_monthly_stats,
     get_stats_summary,
     get_unenriched_games,
+    get_untried_games,
     update_game_enrichment,
     increment_enrichment_retries,
 )
@@ -294,6 +295,21 @@ def test_get_unenriched_games_skips_exhausted_retries(conn):
     for _ in range(3):
         increment_enrichment_retries(conn, game_id)
     assert get_unenriched_games(conn) == []
+
+
+def test_get_untried_games_returns_new_games_under_prefix(conn):
+    upsert_game(conn, "vita://PCSA00096", "Sly", "PS Vita", "Sly Cooper")
+    upsert_game(conn, "/roms/mgs.chd", "MGS", "PS1", "Metal Gear Solid")
+    games = get_untried_games(conn, "vita://")
+    assert [g["file_path"] for g in games] == ["vita://PCSA00096"]
+
+
+def test_get_untried_games_skips_enriched_and_already_tried(conn):
+    done = upsert_game(conn, "vita://PCSA00126", "GoW", "PS Vita", "God of War Collection")
+    update_game_enrichment(conn, done)
+    tried = upsert_game(conn, "vita://GTASA0000", "GTA", "PS Vita", "GTA San Andreas")
+    increment_enrichment_retries(conn, tried)
+    assert get_untried_games(conn, "vita://") == []
 
 
 def test_update_game_enrichment_sets_enriched_at_and_fields(conn):
