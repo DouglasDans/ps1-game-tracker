@@ -2,6 +2,7 @@ const PLATFORM_LOGO = {
   PS1: '/assets/ps1.svg',
   PS2: '/assets/ps2.svg',
   PSP: '/assets/psp.svg',
+  'PS Vita': '/assets/vita.svg',
   Dreamcast: '/assets/dc.svg',
   SNES: '/assets/snes.svg',
   'Game Boy': '/assets/gb.svg',
